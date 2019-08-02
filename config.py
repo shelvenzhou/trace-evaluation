@@ -6,6 +6,8 @@ class Config:
 
     REENTRANCY_ADDRS_MAP = '/home/xiangjie/logs/pickles/reen_addrs2target'
 
+    CI_LOG_FILE = '/home/xiangjie/logs/call-injection-analyzer-20190607031718.log'
+
 
     token_valuable = [
         '0x8a88f04e0c905054d2f33b26bb3a46d7091a039a',
