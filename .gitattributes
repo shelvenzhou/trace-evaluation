@@ -1,0 +1,7 @@
+res/defense_contracts/only_owner.csv filter=lfs diff=lfs merge=lfs -text
+res/defense_contracts/safemath.csv filter=lfs diff=lfs merge=lfs -text
+res/defense_contracts/airdrop_contracts.csv filter=lfs diff=lfs merge=lfs -text
+res/defense_contracts/can_distr.csv filter=lfs diff=lfs merge=lfs -text
+res/defense_contracts/contracts_with_source.csv filter=lfs diff=lfs merge=lfs -text
+res/defense_contracts/is_human.csv filter=lfs diff=lfs merge=lfs -text
+res/defense_contracts/non_reentrant.csv filter=lfs diff=lfs merge=lfs -text
