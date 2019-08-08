@@ -43,6 +43,7 @@ class RelatedWorks:
             "Securify",
             "Vandal",
             "ZEUS",
+            "teEther",
         ]
 
         self.datasets = dict()
