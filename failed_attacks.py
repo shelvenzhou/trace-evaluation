@@ -1,13 +1,15 @@
-from transaction_trace.analysis.results import AttackCandidateExporter
-from related_works import RelatedWorks
 from collections import defaultdict
+
 from IPython import embed
+
+from file_loader import FileLoader
+from related_works import RelatedWorks
 
 if __name__ == "__main__":
     w = RelatedWorks()
 
     with open("res/results/failed-attacks-20190730.log", "r") as f:
-        raw_data = AttackCandidateExporter.load_candidates(f)
+        raw_data = FileLoader.load_attack_candidates(f)
 
     failed_attacks = defaultdict(list)
     for attack in raw_data:
