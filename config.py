@@ -8,6 +8,8 @@ class Config:
 
     CI_LOG_FILE = '/home/xiangjie/logs/call-injection-analyzer-20190607031718.log'
 
+    CONTRACT_CACHE_PICKLE_FILE = '/home/xiangjie/logs/pickles/contract_cache'
+
 
     token_valuable = [
         '0x8a88f04e0c905054d2f33b26bb3a46d7091a039a',
