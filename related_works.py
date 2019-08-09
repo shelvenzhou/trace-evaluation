@@ -20,8 +20,8 @@ class RelatedWorksRunner:
         if not os.path.exists(outputs_dir):
             os.mkdir(outputs_dir)
         for v in dirs:
-            # if v not in  ('integer-overflow'):
-            #     continue
+            if v not in  ('call-injection'):
+                continue
             print("running on {}".format(v))
             vp = os.path.join(self.bytecodes_path, v)
             for bytecode_file in os.listdir(vp):
@@ -31,7 +31,7 @@ class RelatedWorksRunner:
                 output_dir = os.path.join(outputs_dir, v)
                 if not os.path.exists(output_dir):
                     os.mkdir(output_dir)
-                output_file = os.path.join(output_dir, "{}.json".format(address))
+                output_file = os.path.join(output_dir, "{}".format(address))
                 print(bytecode_file)
                 re = os.popen(cmd.format(target, output_file))
                 print(re.read())
@@ -50,7 +50,7 @@ class RelatedWorksRunner:
 
     def run_oyente(self):
         # docker_cmd = "sudo docker run -i -t -v ~/logs/evaluation:/evaluation luongnguyen/oyente"
-        cmd = "python oyente/oyente.py -s /evaluation/bytecodes/reentrancy/{} -b > /evaluation/oyente/reentrancy/{} 2>&1"
+        cmd = "python /oyente/oyente/oyente.py -s /evaluation/bytecodes/reentrancy/{} -b > /evaluation/oyente/reentrancy/{} 2>&1"
 
         print(time.ctime(), 'oyente')
         for bytecode_file in os.listdir("/evaluation/bytecodes/reentrancy"):

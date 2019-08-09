@@ -197,7 +197,6 @@ class EvalData(object):
                 t = None
                 for intention in details['attacks']:
                     if intention['iter_num'] > threshold.iter_num:
-                        f = True
                         cycle = intention['cycle']
                         addrs = str(tuple(sorted(cycle)))
                         if addrs not in self.reen_cycle2target:
