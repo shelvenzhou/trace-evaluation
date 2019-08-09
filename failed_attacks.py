@@ -1,18 +1,31 @@
+import csv
 from collections import defaultdict
 
 from IPython import embed
 
 from file_loader import FileLoader
 from related_works import RelatedWorks
+from result_filter import ResultFilter
 
 if __name__ == "__main__":
     w = RelatedWorks()
 
-    with open("res/results/failed-attacks-20190730.log", "r") as f:
-        raw_data = FileLoader.load_attack_candidates(f)
+    open_source = set()
+    with open("res/defense_contracts/contracts_with_source.csv", "r") as f:
+        r = csv.reader(f)
+        for row in r:
+            open_source.add(row[0])
 
+    confirmed_data = FileLoader.load_attack_candidates("res/results/attack-candidates-20190807.log")
+    confirmed_attacks = defaultdict(list)
+    for attack in confirmed_data:
+        confirmed_attacks[attack.type].append(attack)
+
+    filtered_honeypot = ResultFilter.filter_honeypot_results(confirmed_attacks["honeypot"])
+
+    failed_data = FileLoader.load_attack_candidates("res/results/failed-attacks-20190807.log")
     failed_attacks = defaultdict(list)
-    for attack in raw_data:
+    for attack in failed_data:
         failed_attacks[attack.type].append(attack)
 
     call_injection_targets = defaultdict(list)
