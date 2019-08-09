@@ -1,10 +1,64 @@
 import json
 import os
+import time
 from collections import defaultdict
 
 from config import Config
 from vulnerability_type import (VT_AH, VT_CAD, VT_CI, VT_HP, VT_IO, VT_RE,
                                 vulnerability_mapping)
+
+
+class RelatedWorksRunner:
+
+    def __init__(self, eval_path):
+        self.eval_path = eval_path
+        self.bytecodes_path = os.path.join(eval_path, 'bytecodes')
+
+    def run(self, cmd, name, addr=False):
+        print(time.ctime(), name)
+        dirs = os.listdir(self.bytecodes_path)
+        outputs_dir = os.path.join(self.eval_path, name)
+        if not os.path.exists(outputs_dir):
+            os.mkdir(outputs_dir)
+        for v in dirs:
+            if v not in ('call-injection'):
+                continue
+            print("running on {}".format(v))
+            vp = os.path.join(self.bytecodes_path, v)
+            for bytecode_file in os.listdir(vp):
+                address = bytecode_file.strip('.hex')
+                target = address if addr else os.path.join(vp, bytecode_file)
+
+                output_dir = os.path.join(outputs_dir, v)
+                if not os.path.exists(output_dir):
+                    os.mkdir(output_dir)
+                output_file = os.path.join(output_dir, "{}".format(address))
+                print(bytecode_file)
+                re = os.popen(cmd.format(target, output_file))
+                print(re.read())
+
+    def run_mythril(self):
+        cmd = "myth analyze -a {} -o json > {} --execution-timeout 120"
+        self.run(cmd, 'mythril', addr=True)
+
+    def run_teether(self):
+        cmd = "python3 /home/xiangjie/teether/bin/gen_exploit.py {} 0x1234 0x1000 +1000 {}"
+        self.run(cmd, 'teether')
+
+    def run_securify(self):
+        cmd = "java -jar /home/xiangjie/securify/build/libs/securify.jar -fh {} --livestatusfile {}"
+        self.run(cmd, 'securify')
+
+    def run_oyente(self):
+        # docker_cmd = "sudo docker run -i -t -v ~/logs/evaluation:/evaluation luongnguyen/oyente"
+        cmd = "python /oyente/oyente/oyente.py -s /evaluation/bytecodes/reentrancy/{} -b > /evaluation/oyente/reentrancy/{} 2>&1"
+
+        print(time.ctime(), 'oyente')
+        for bytecode_file in os.listdir("/evaluation/bytecodes/reentrancy"):
+            targte = bytecode_file
+            address = bytecode_file.strip('.hex')
+            output_file = "{}.out".format(address)
+            os.system(cmd.format(targte, output_file))
 
 
 class Dataset:
