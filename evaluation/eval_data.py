@@ -1,16 +1,12 @@
-from transaction_trace.local import ContractCode, EthereumDatabase
+from transaction_trace.local import ContractCode
 from transaction_trace.analysis.results import AttackCandidateExporter, AttackCandidate
-from transaction_trace.basic_utils import DatetimeUtils
 from transaction_trace.local import EVMExecutor
 
 from config import Config
-from vulnerability_type import vulnerability_mapping
-from related_works import RelatedWorks
 
 import pickle
 import json
 from collections import defaultdict
-from datetime import datetime
 from web3 import Web3
 import os
 
@@ -25,25 +21,27 @@ class AbnormalData(object):
 class EvalData(object):
     def __init__(self, attack_log_path, failed_attack_log_path, db_passwd):
         self.contract_code_db = ContractCode(passwd=db_passwd)
-        self.related_works = RelatedWorks()
+        self.evm_executor = EVMExecutor()
+
         self.attack_log_path = attack_log_path
         self.failed_attack_log_path = failed_attack_log_path
-        self.evm_executor = EVMExecutor()
 
         self.contract_cache = dict()
         self.source_code_cache = dict()
-        self.reen_addrs2target = None
         self.create_time = None
+
+        self.reen_cycle2target = None
         self.integer_overflow_contracts = None
         self.integer_overflow_cve = None
 
         self.parity_wallet = set()
         self.honeypot_profit_txs = defaultdict(list)
+
         self.attack_candidates = None
         self.failed_candidates = None
 
-        self.token_loss = None
-        self.reen_eth_loss = None
+        self.attack_loss = None
+        self.failed_loss = None
 
         self.cad = AbnormalData()
         self.attack_data = AbnormalData()
@@ -78,9 +76,6 @@ class EvalData(object):
                         f.write(bytecode)
 
     def load_data(self):
-        with open(Config.REENTRANCY_ADDRS_MAP, 'rb') as f:
-            self.reen_addrs2target = pickle.load(f)
-
         with open(Config.CONTRACT_CREATE_TIME, 'rb') as f:
             self.create_time = pickle.load(f)
 
@@ -89,6 +84,9 @@ class EvalData(object):
 
         with open(self.failed_attack_log_path, 'rb') as f:
             self.failed_candidates = AttackCandidateExporter.load_candidates(f)
+
+        with open('res/case-study/reentrancy-cycle2target.json', 'rb') as f:
+            self.reen_cycle2target = json.load(f)
 
         with open('res/case-study/integer-overflow-contracts.json', 'rb') as f:
             self.integer_overflow_contracts = json.load(f)
@@ -152,13 +150,15 @@ class EvalData(object):
 
     def extract_data(self, succeed_threshold, failed_threshold):
         self.extract_abnormal_data(
-            self.attack_candidates, self.attack_data, succeed_threshold, True, True)
+            self.attack_candidates, self.attack_data, succeed_threshold)
         self.extract_abnormal_data(
-            self.failed_candidates, self.failed_data, failed_threshold)
+            self.failed_candidates, self.failed_data, failed_threshold, True)
 
-    def extract_abnormal_data(self, candidates, abnormal_data, threshold, cad=False, loss=False):
-        token_loss = defaultdict(int)
-        eth_lost = defaultdict(int)
+    def extract_abnormal_data(self, candidates, abnormal_data, threshold, failed_data=False):
+        eco_loss = {
+            'ether': defaultdict(dict),
+            'token': defaultdict(dict)
+        }
         for cand in candidates:
             v = cand.type
             details = cand.details
@@ -168,17 +168,15 @@ class EvalData(object):
                 continue
             tx_hash = details['transaction'] if v != 'honeypot' else details['profit_txs'][0]
             targets = []
-            air_move_targets = []
             if v == 'airdrop-hunting' and details['hunting_time'] > threshold.hunting_time:
                 for node in results:
                     for result_type in results[node]:
                         if result_type.split(':')[0] == 'TOKEN_TRANSFER_EVENT':
                             token = result_type.split(':')[-1]
-                            token_loss[v] += results[node][result_type]
-                            if details['slave_number'] == details['hunting_time']:
-                                air_move_targets.append(token)
-                            else:
-                                targets.append(token)
+                            targets.append(token)
+                            if token not in eco_loss['token']['airdrop-hunting']:
+                                eco_loss['token']['airdrop-hunting'][token] = 0
+                            eco_loss['token']['airdrop-hunting'][token] += results[node][result_type]
             elif v == 'call-injection':
                 for attack in details['attacks']:
                     targets.append(attack['entry_edge'][1].split(':')[1])
@@ -191,39 +189,45 @@ class EvalData(object):
                     for result_type in results[node]:
                         if result_type.split(':')[0] == 'TOKEN_TRANSFER_EVENT':
                             token = result_type.split(':')[-1]
-                            token_loss[v] += results[node][result_type]
-                            if token in self.integer_overflow_contracts['candidates']:
-                                targets.append(token)
+                            targets.append(token)
+                            if token not in eco_loss['token']['integer-overflow']:
+                                eco_loss['token']['integer-overflow'][token] = 0
+                            eco_loss['token']['integer-overflow'][token] += results[node][result_type]
             elif v == 'reentrancy':
+                t = None
                 for intention in details['attacks']:
                     if intention['iter_num'] > threshold.iter_num:
+                        f = True
                         cycle = intention['cycle']
-                        addrs = tuple(sorted(cycle))
-                        if addrs not in self.reen_addrs2target:
+                        addrs = str(tuple(sorted(cycle)))
+                        if addrs not in self.reen_cycle2target:
                             print(tx_hash, addrs)
-                            continue
-                        targets.append(self.reen_addrs2target[addrs])
-                    eth = 0
-                    for node in results:
-                        for result_type in results[node]:
-                            if result_type == 'ETHER_TRANSFER':
-                                if results[node][result_type] > eth:
-                                    eth = results[node][result_type]
-                    eth_lost[targets[0]] += Web3.fromWei(eth, 'ether')
-            elif v == 'call-after-destruct-checker' and cad:
+                            import IPython;IPython.embed()
+                        else:
+                            t = self.reen_cycle2target[addrs]
+                            targets.append(t)
+                if t is None:
+                    continue
+                eth = 0
+                for node in results:
+                    for result_type in results[node]:
+                        rt = result_type.split(':')[0]
+                        if rt == 'ETHER_TRANSFER':
+                            if results[node][result_type] > eth:
+                                eth = results[node][result_type]
+                        elif rt == 'TOKEN_TRANSFER_EVENT':
+                            token = result_type.split(':')[-1]
+                            if token not in eco_loss['token']['reentrancy']:
+                                eco_loss['token']['reentrancy'][token] = 0
+                            eco_loss['token']['reentrancy'][token] += results[node][result_type]
+                if t not in eco_loss['ether']['reentrancy']:
+                    eco_loss['ether']['reentrancy'][t] = 0
+                    eco_loss['ether']['reentrancy'][t] += Web3.fromWei(eth, 'ether')
+            elif v == 'call-after-destruct' and not failed_data:
                 suicided_contract = details['suicided_contract']
                 self.cad.vul2txs[v].add(tx_hash)
                 self.cad.vul2contrs[v].add(suicided_contract)
 
-            if len(air_move_targets) > 0:
-                self.attack_data.vul2txs[v].add(tx_hash)
-                for target in air_move_targets:
-                    self.attack_data.vul2contrs[v].add(target)
-                    if target not in self.attack_data.contr2txs[v]:
-                        self.attack_data.contr2txs[v][target] = set()
-                    self.attack_data.contr2txs[v][target].add(tx_hash)
-                    if self.open_source_contract(target):
-                        self.attack_data.vul2contrs_open_sourced[v].add(target)
             if len(targets) == 0:
                 continue
             abnormal_data.vul2txs[v].add(tx_hash)
@@ -235,6 +239,15 @@ class EvalData(object):
                 if self.open_source_contract(target):
                     abnormal_data.vul2contrs_open_sourced[v].add(target)
 
-        if loss:
-            self.token_loss = token_loss
-            self.reen_eth_loss = eth_lost
+        if failed_data:
+            self.failed_loss = eco_loss
+        else:
+            self.attack_loss = eco_loss
+
+    def update_confirmed_vuls(self):
+        self.confirmed_vuls = {
+            'call-injection': self.parity_wallet,
+            'reentrancy': self.attack_data.vul2contrs_open_sourced['reentrancy'],
+            'integer-overflow': self.integer_overflow_contracts['confirmed'],
+            'airdrop-hunting': self.attack_data.vul2contrs_open_sourced['airdrop-hunting']
+        }

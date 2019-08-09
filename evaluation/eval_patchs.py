@@ -112,11 +112,3 @@ class EvalPatchs(object):
                     row['entry'])
             if 'initWallet(address[],uint256,uint256)' in row['behavior']:
                 self.ed.parity_wallet.add(row['entry'])
-                self.ed.confirmed_vuls['call-injection'].add(row['entry'])
-
-        self.ed.confirmed_vuls['reentrancy'] = self.ed.attack_data.vul2contrs_open_sourced['reentrancy'].copy(
-        )
-
-        self.ed.confirmed_vuls['integer-overflow'] = self.ed.integer_overflow_contracts['confirmed']
-
-        self.ed.confirmed_vuls['airdrop-hunting'] = self.ed.attack_data.vul2contrs_open_sourced['airdrop-hunting'].copy()
