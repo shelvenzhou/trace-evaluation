@@ -1,9 +1,10 @@
-from vulnerability_type import VT_AH, VT_CAD, VT_CI, VT_HP, VT_IO, VT_RE, vulnerability_mapping
-from config import Config
-
-from collections import defaultdict
-import os
 import json
+import os
+from collections import defaultdict
+
+from config import Config
+from vulnerability_type import (VT_AH, VT_CAD, VT_CI, VT_HP, VT_IO, VT_RE,
+                                vulnerability_mapping)
 
 
 class Dataset:

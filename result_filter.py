@@ -3,16 +3,13 @@ def move(item, from_list, to_list):
     to_list.append(item)
 
 
-def honeypot_filter(honeypot):
-    return honeypot.details["status"] == "INITIALIZED" \
-        or honeypot.details["tx_count"] > 20
-
-
 class ResultFilter:
+
     @staticmethod
-    def filter_honeypot_results(honeypots):
-        filtered = list()
-        for h in honeypots:
-            if honeypot_filter(h):
-                move(h, honeypots, filtered)
-        return filtered
+    def honeypot_filter(honeypot):
+        """
+        Filter contract which is definitely not honeypot,
+        no matter whether it's confirmed or failed
+        """
+        return honeypot.details["status"] == "INITIALIZED" \
+            or honeypot.details["tx_count"] > 20
