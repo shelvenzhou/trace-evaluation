@@ -6,6 +6,7 @@ from config import Config
 
 import pickle
 import json
+import csv
 from collections import defaultdict
 from web3 import Web3
 import os
@@ -30,10 +31,12 @@ class EvalData(object):
         self.contract_cache = dict()
         self.source_code_cache = dict()
         self.create_time = None
+        self.eth_price = None
 
         self.reen_cycle2target = None
         self.integer_overflow_contracts = None
         self.integer_overflow_cve = None
+        self.defense_contracts = dict()
 
         self.parity_wallet = set()
         self.honeypot_profit_txs = defaultdict(list)
@@ -43,6 +46,7 @@ class EvalData(object):
 
         self.attack_loss = None
         self.failed_loss = None
+        self.eth_dollar_loss = None
 
         self.cad = AbnormalData()
         self.attack_data = AbnormalData()
@@ -94,8 +98,27 @@ class EvalData(object):
 
         with open('res/case-study/integer-overflow-cvelist.json', 'rb') as f:
             self.integer_overflow_cve = json.load(f)
+
         with open('res/case-study/open-source-reentrancy.json', 'rb') as f:
             self.open_source_reentrancy = json.load(f)
+
+        with open('res/base-data/eth_price.json', 'rb') as f:
+            self.eth_price = json.load(f)
+
+        with open('res/defense_contracts/can_distr.csv', 'r') as f:
+            self.defense_contracts['can_distr'] = [i[0] for i in csv.reader(f)]
+
+        with open('res/defense_contracts/is_human.csv', 'r') as f:
+            self.defense_contracts['is_human'] = [i[0] for i in csv.reader(f)]
+
+        with open('res/defense_contracts/non_reentrant.csv', 'r') as f:
+            self.defense_contracts['non_reentrant'] = [i[0] for i in csv.reader(f)]
+
+        with open('res/defense_contracts/only_owner.csv', 'r') as f:
+            self.defense_contracts['only_owner'] = [i[0] for i in csv.reader(f)]
+
+        with open('res/defense_contracts/safemath.csv', 'r') as f:
+            self.defense_contracts['safemath'] = [i[0] for i in csv.reader(f)]
 
         if not os.path.exists(Config.CONTRACT_CACHE_PICKLE_FILE):
             return
@@ -162,10 +185,12 @@ class EvalData(object):
             'ether': defaultdict(dict),
             'token': defaultdict(dict)
         }
+        eth_dollar_loss = defaultdict(dict)
         for cand in candidates:
             v = cand.type
             details = cand.details
             results = cand.results
+            tx_time = details['tx_time']
 
             if v == 'honeypot':
                 continue
@@ -230,7 +255,10 @@ class EvalData(object):
                             eco_loss['token']['reentrancy'][token] += results[node][result_type]
                 if t not in eco_loss['ether']['reentrancy']:
                     eco_loss['ether']['reentrancy'][t] = 0
-                eco_loss['ether']['reentrancy'][t] += Web3.fromWei(eth, 'ether')
+                    eth_dollar_loss['reentrancy'][t] = 0
+                eth = Web3.fromWei(eth, 'ether')
+                eco_loss['ether']['reentrancy'][t] += eth
+                eth_dollar_loss['reentrancy'][t] += eth * self.eth_price[tx_time[:10]]
             elif v == 'call-after-destruct' and not failed_data:
                 suicided_contract = details['suicided_contract']
                 self.cad.vul2txs[v].add(tx_hash)
@@ -238,7 +266,10 @@ class EvalData(object):
                 if 'ETHER_TRANSFER' in results:
                     if suicided_contract not in eco_loss['ether']['call-after-destruct']:
                         eco_loss['ether']['call-after-destruct'][suicided_contract] = 0
-                    eco_loss['ether']['call-after-destruct'][suicided_contract] += Web3.fromWei(results['ETHER_TRANSFER'], 'ether')
+                        eth_dollar_loss['call-after-destruct'][suicided_contract] = 0
+                    eth = Web3.fromWei(results['ETHER_TRANSFER'], 'ether')
+                    eco_loss['ether']['call-after-destruct'][suicided_contract] += eth
+                    eth_dollar_loss['call-after-destruct'][suicided_contract] += eth * self.eth_price[tx_time[:10]]
 
             if len(targets) == 0:
                 continue
