@@ -10,6 +10,19 @@ class EvalPatchs(object):
     def __init__(self, eval_data):
         self.ed = eval_data
 
+    def move_airdrop_data_from_failed(self):
+        to_remove = list()
+        for cand in self.ed.failed_candidates:
+            v = cand.type
+            details = cand.details
+            results = cand.results
+            if v == 'airdrop-hunting' and details['slave_number'] == details['hunting_time'] and len(results) > 0:
+                to_remove.append(cand)
+        for cand in to_remove:
+            self.ed.attack_candidates.append(cand)
+            self.ed.failed_candidates.remove(cand)
+
+
     def replace_honey_pot(self, abnormal_data, honeypot_log_path):
         abnormal_data.vul2txs['honeypot'].clear()
         abnormal_data.vul2contrs['honeypot'].clear()

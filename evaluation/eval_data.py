@@ -9,6 +9,7 @@ import json
 from collections import defaultdict
 from web3 import Web3
 import os
+from IPython import embed
 
 
 class AbnormalData(object):
@@ -93,6 +94,8 @@ class EvalData(object):
 
         with open('res/case-study/integer-overflow-cvelist.json', 'rb') as f:
             self.integer_overflow_cve = json.load(f)
+        with open('res/case-study/open-source-reentrancy.json', 'rb') as f:
+            self.open_source_reentrancy = json.load(f)
 
         if not os.path.exists(Config.CONTRACT_CACHE_PICKLE_FILE):
             return
@@ -172,7 +175,7 @@ class EvalData(object):
                 for node in results:
                     for result_type in results[node]:
                         if result_type.split(':')[0] == 'TOKEN_TRANSFER_EVENT':
-                            token = result_type.split(':')[-1]
+                            token = result_type.split(':')[1]
                             targets.append(token)
                             if token not in eco_loss['token']['airdrop-hunting']:
                                 eco_loss['token']['airdrop-hunting'][token] = 0
@@ -184,29 +187,35 @@ class EvalData(object):
                 targets.append(details['contract'])
                 self.honeypot_profit_txs[details['contract']
                                          ] = details['profit_txs']
-            elif v == 'integer-overflow':
-                for node in results:
-                    for result_type in results[node]:
-                        if result_type.split(':')[0] == 'TOKEN_TRANSFER_EVENT':
-                            token = result_type.split(':')[-1]
-                            targets.append(token)
-                            if token not in eco_loss['token']['integer-overflow']:
-                                eco_loss['token']['integer-overflow'][token] = 0
-                            eco_loss['token']['integer-overflow'][token] += results[node][result_type]
+            elif v == 'integer-overflow' :
+                if failed_data:
+                    for attack in details['attacks']:
+                        targets.append(attack['edge'][1].split(':')[1])
+                else:
+                    for node in results['profits']:
+                        for result_type in results['profits'][node]:
+                            if result_type.split(':')[0] == 'TOKEN_TRANSFER_EVENT':
+                                token = result_type.split(':')[1]
+                                amount = results['profits'][node][result_type]
+                                if token not in self.integer_overflow_contracts['candidates'] or amount <= threshold.overflow_thr:
+                                    continue
+                                targets.append(token)
+                                if token not in eco_loss['token']['integer-overflow']:
+                                    eco_loss['token']['integer-overflow'][token] = 0
+                                eco_loss['token']['integer-overflow'][token] += results['profits'][node][result_type]
             elif v == 'reentrancy':
-                t = None
                 for intention in details['attacks']:
                     if intention['iter_num'] > threshold.iter_num:
                         cycle = intention['cycle']
                         addrs = str(tuple(sorted(cycle)))
                         if addrs not in self.reen_cycle2target:
-                            print(tx_hash, addrs)
-                            import IPython;IPython.embed()
+                            print('reentrancy', tx_hash, addrs)
+                            embed()
                         else:
                             t = self.reen_cycle2target[addrs]
+                            if t == '0xc6b330df38d6ef288c953f1f2835723531073ce2':
+                                continue
                             targets.append(t)
-                if t is None:
-                    continue
                 eth = 0
                 for node in results:
                     for result_type in results[node]:
@@ -215,17 +224,21 @@ class EvalData(object):
                             if results[node][result_type] > eth:
                                 eth = results[node][result_type]
                         elif rt == 'TOKEN_TRANSFER_EVENT':
-                            token = result_type.split(':')[-1]
+                            token = result_type.split(':')[1]
                             if token not in eco_loss['token']['reentrancy']:
                                 eco_loss['token']['reentrancy'][token] = 0
                             eco_loss['token']['reentrancy'][token] += results[node][result_type]
                 if t not in eco_loss['ether']['reentrancy']:
                     eco_loss['ether']['reentrancy'][t] = 0
-                    eco_loss['ether']['reentrancy'][t] += Web3.fromWei(eth, 'ether')
+                eco_loss['ether']['reentrancy'][t] += Web3.fromWei(eth, 'ether')
             elif v == 'call-after-destruct' and not failed_data:
                 suicided_contract = details['suicided_contract']
                 self.cad.vul2txs[v].add(tx_hash)
                 self.cad.vul2contrs[v].add(suicided_contract)
+                if 'ETHER_TRANSFER' in results:
+                    if suicided_contract not in eco_loss['ether']['call-after-destruct']:
+                        eco_loss['ether']['call-after-destruct'][suicided_contract] = 0
+                    eco_loss['ether']['call-after-destruct'][suicided_contract] += Web3.fromWei(results['ETHER_TRANSFER'], 'ether')
 
             if len(targets) == 0:
                 continue
