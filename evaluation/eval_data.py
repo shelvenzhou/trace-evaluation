@@ -22,7 +22,8 @@ class AbnormalData(object):
 
 class EvalData(object):
     def __init__(self, attack_log_path, failed_attack_log_path, db_passwd):
-        self.contract_code_db = ContractCode(passwd=db_passwd)
+        # self.contract_code_db = ContractCode(passwd=db_passwd)
+        self.contract_code_db = None
         self.evm_executor = EVMExecutor()
 
         self.attack_log_path = attack_log_path
@@ -30,6 +31,7 @@ class EvalData(object):
 
         self.contract_cache = dict()
         self.source_code_cache = dict()
+        self.open_source_contracts = None
         self.create_time = None
         self.eth_price = None
 
@@ -38,6 +40,7 @@ class EvalData(object):
         self.integer_overflow_cve = None
         self.defense_contracts = dict()
 
+        self.tx_time = dict()
         self.parity_wallet = set()
         self.honeypot_profit_txs = defaultdict(list)
 
@@ -56,11 +59,11 @@ class EvalData(object):
 
         self.load_data()
 
-    def __del__(self):
-        print('dumping contract cache')
-        with open('/home/xiangjie/logs/pickles/contract_cache', 'wb') as f:
-            pickle.dump({'contract_cache': self.contract_cache,
-                            'source_code_cache': self.source_code_cache}, f)
+    # def __del__(self):
+    #     print('dumping contract cache')
+    #     with open('local_res/contract_cache', 'wb') as f:
+    #         pickle.dump({'contract_cache': self.contract_cache,
+    #                         'source_code_cache': self.source_code_cache}, f)
 
     def dump_bytecode(self, dump_path):
         if not os.path.exists(dump_path):
@@ -105,6 +108,9 @@ class EvalData(object):
         with open('res/base-data/eth_price.json', 'rb') as f:
             self.eth_price = json.load(f)
 
+        with open('res/defense_contracts/contracts_with_source.csv', 'r') as f:
+            self.open_source_contracts = set([i[0] for i in csv.reader(f)])
+
         with open('res/defense_contracts/can_distr.csv', 'r') as f:
             self.defense_contracts['can_distr'] = [i[0] for i in csv.reader(f)]
 
@@ -128,6 +134,8 @@ class EvalData(object):
             self.source_code_cache = o['source_code_cache']
 
     def open_source_contract(self, address):
+        if address in self.open_source_contracts:
+            return True
         self.read_contract_info(address)
         if self.contract_cache[address]:
             bytecode_hash = self.contract_cache[address]['bytecode_hash']
@@ -190,11 +198,14 @@ class EvalData(object):
             v = cand.type
             details = cand.details
             results = cand.results
-            tx_time = details['tx_time']
 
             if v == 'honeypot':
                 continue
             tx_hash = details['transaction'] if v != 'honeypot' else details['profit_txs'][0]
+            if 'tx_time' in details:
+                tx_time = details['tx_time']
+                self.tx_time[tx_hash] = tx_time
+
             targets = []
             if v == 'airdrop-hunting' and details['hunting_time'] > threshold.hunting_time:
                 for node in results:
@@ -256,7 +267,7 @@ class EvalData(object):
                 if t not in eco_loss['ether']['reentrancy']:
                     eco_loss['ether']['reentrancy'][t] = 0
                     eth_dollar_loss['reentrancy'][t] = 0
-                eth = Web3.fromWei(eth, 'ether')
+                eth = int(Web3.fromWei(eth, 'ether'))
                 eco_loss['ether']['reentrancy'][t] += eth
                 eth_dollar_loss['reentrancy'][t] += eth * self.eth_price[tx_time[:10]]
             elif v == 'call-after-destruct' and not failed_data:
@@ -267,9 +278,9 @@ class EvalData(object):
                     if suicided_contract not in eco_loss['ether']['call-after-destruct']:
                         eco_loss['ether']['call-after-destruct'][suicided_contract] = 0
                         eth_dollar_loss['call-after-destruct'][suicided_contract] = 0
-                    eth = Web3.fromWei(results['ETHER_TRANSFER'], 'ether')
+                    eth = int(Web3.fromWei(results['ETHER_TRANSFER'], 'ether'))
                     eco_loss['ether']['call-after-destruct'][suicided_contract] += eth
-                    eth_dollar_loss['call-after-destruct'][suicided_contract] += eth * self.eth_price[tx_time[:10]]
+                    # eth_dollar_loss['call-after-destruct'][suicided_contract] += eth * self.eth_price[tx_time[:10]]
 
             if len(targets) == 0:
                 continue

@@ -100,7 +100,7 @@ class EvalPatchs(object):
                     abnormal_data.vul2contrs_open_sourced[v].add(target)
         return eth_lost
 
-    def replace_call_injection_data(self, abnormal_data):
+    def replace_call_injection_data(self, abnormal_data, tx_time):
         abnormal_data.vul2txs['call-injection'].clear()
         abnormal_data.vul2contrs['call-injection'].clear()
         abnormal_data.contr2txs['call-injection'].clear()
@@ -114,6 +114,7 @@ class EvalPatchs(object):
 
         for row in rows:
             tx_hash = row['tx_hash']
+            tx_time[tx_hash] = row['time']
             abnormal_data.vul2txs['call-injection'].add(tx_hash)
             abnormal_data.vul2contrs['call-injection'].add(row['entry'])
             if row['entry'] not in abnormal_data.contr2txs['call-injection']:

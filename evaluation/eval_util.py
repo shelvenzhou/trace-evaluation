@@ -138,45 +138,30 @@ class EvalUtil(object):
         print("{} of confirmed adversarial  transactions  are  targeting  {}  vulnerabilities".format(
             len(missed_txs)/len(succeed_txs), len(missed_vuls)))
 
-        # txs = set()
-        # for v in self.attack_data.vul2txs:
-        #     for tx in self.attack_data.vul2txs[v]:
-        #         txs.add(tx)
-        # for v in self.failed_data.vul2txs:
-        #     for tx in self.failed_data.vul2txs[v]:
-        #         txs.add(tx)
-        # tx_time = dict()
-        # db = EthereumDatabase('/mnt/data/bigquery/ethereum_transactions', 'transactions')
-        # for con in db.get_all_connnections():
-        #     print(con)
-        #     for row in con.read('transactions', '*'):
-        #         tx_hash = row['hash']
-        #         if tx_hash in txs:
-        #             tx_time[tx_hash] = row['block_timestamp']
 
-        # attemp_txs = set()
-        # confirm_txs = set()
-        # for v in ('reentrancy', 'call-injection'):
-        #     for tx in self.attack_data.vul2txs[v]:
-        #         if tx_time[tx] > datetime(2015, 8, 1, 0, 0) and tx_time[tx] < datetime(2017, 8, 1, 0, 0):
-        #             attemp_txs.add(tx)
-        #             if tx in succeed_txs:
-        #                 confirm_txs.add(tx)
-        #     for tx in self.failed_data.vul2txs[v]:
-        #         if tx_time[tx] > datetime(2015, 8, 1, 0, 0) and tx_time[tx] < datetime(2017, 8, 1, 0, 0):
-        #             attemp_txs.add(tx)
+        attemp_txs = set()
+        confirm_txs = set()
+        for v in ('reentrancy', 'call-injection'):
+            for tx in self.ed.attack_data.vul2txs[v]:
+                if self.ed.tx_time[tx] > "2015-08-01" and self.ed.tx_time[tx] < "2017-08-01":
+                    attemp_txs.add(tx)
+                    if tx in succeed_txs:
+                        confirm_txs.add(tx)
+            for tx in self.ed.failed_data.vul2txs[v]:
+                if self.ed.tx_time[tx] > "2015-08-01" and self.ed.tx_time[tx] < "2017-08-01":
+                    attemp_txs.add(tx)
 
-        # print("{} attemped, {} confirmed between 2015.8 and 2017.8".format(len(attemp_txs)/len(attempted_txs), len(confirm_txs)/len(succeed_txs)))
+        print("{} attemped, {} confirmed between 2015.8 and 2017.8".format(len(attemp_txs)/len(attempted_txs), len(confirm_txs)/len(succeed_txs)))
 
-        # attemp_txs = set()
-        # confirm_txs = set()
-        # for v in ('airdrop-hunting', 'integer-overflow'):
-        #     for tx in self.attack_data.vul2txs[v]:
-        #         if tx_time[tx] > datetime(2017, 9, 1, 0, 0) and tx_time[tx] < datetime(2019, 3, 1, 0, 0):
-        #             attemp_txs.add(tx)
-        #             if tx in succeed_txs:
-        #                 confirm_txs.add(tx)
-        #     for tx in self.failed_data.vul2txs[v]:
-        #         if tx_time[tx] > datetime(2017, 9, 1, 0, 0) and tx_time[tx] < datetime(2019, 3, 1, 0, 0):
-        #             attemp_txs.add(tx)
-        # print("{} attemped, {} confirmed between 2017.9 and 2019.3".format(len(attemp_txs)/len(attempted_txs), len(confirm_txs)/len(succeed_txs)))
+        attemp_txs = set()
+        confirm_txs = set()
+        for v in ('airdrop-hunting', 'integer-overflow'):
+            for tx in self.ed.attack_data.vul2txs[v]:
+                if self.ed.tx_time[tx] > "2017-09-01" and self.ed.tx_time[tx] < "2019-03-01":
+                    attemp_txs.add(tx)
+                    if tx in succeed_txs:
+                        confirm_txs.add(tx)
+            for tx in self.ed.failed_data.vul2txs[v]:
+                if self.ed.tx_time[tx] > "2017-09-01" and self.ed.tx_time[tx] < "2019-03-01":
+                    attemp_txs.add(tx)
+        print("{} attemped, {} confirmed between 2017.9 and 2019.3".format(len(attemp_txs)/len(attempted_txs), len(confirm_txs)/len(succeed_txs)))
