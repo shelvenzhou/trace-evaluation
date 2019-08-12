@@ -7,6 +7,7 @@ from related_works import RelatedWorks
 
 from collections import defaultdict
 from datetime import datetime
+from dateutil.relativedelta import relativedelta
 
 
 
@@ -21,6 +22,97 @@ class EvalUtil(object):
     def __init__(self, eval_data):
         self.ed = eval_data
         self.related_works = RelatedWorks()
+
+    def dat_month2txs(self):
+        begin = datetime(2015, 8, 1, 0, 0)
+        month2txs_dat = dict()
+        while begin < datetime(2019, 4, 1, 0, 0):
+            month2txs_dat[DatetimeUtils.month_to_str(begin)] = {
+                'airdrop-hunting': 0,
+                'reentrancy': 0,
+                'integer-overflow': 0,
+                'call-injection': 0,
+                'call-after-destruct': 0,
+                'honeypot': 0
+            }
+            begin += relativedelta(months=1)
+
+        for m in self.ed.month2txs:
+            for v in self.ed.month2txs[m]:
+                month2txs_dat[m][v] = len(self.ed.month2txs[m[v]])
+
+        return month2txs_dat
+
+    def dat_contract_cdf(self):
+        contr_cdf_dat = defaultdict(dict)
+        for i in range(1, 101):
+            contr_cdf_dat[i] = {
+                'airdrop-hunting': 0,
+                'reentrancy': 0,
+                'integer-overflow': 0,
+                'call-injection': 0,
+                'call-after-destruct': 0,
+                'honeypot': 0
+            }
+        for v in self.ed.attack_data.contr2txs:
+            rows = []
+            for c in self.ed.attack_data.contr2txs[v]:
+                rows.append((c, len(self.ed.attack_data.contr2txs[v][c])))
+            rows.sort(reverse=True, key=lambda x: x[1])
+            l = len(rows)
+            for i in range(1, l+1):
+                row = rows[i-1]
+                pos = int(i*100/l) if int(i*100/l) == i * \
+                    100/l else int(i*100/l+1)
+                contr_cdf_dat[pos][v] += row[1]*100/len(self.ed.attack_data.vul2txs[v])
+        for i in contr_cdf_dat:
+            for v in contr_cdf_dat[i]:
+                if contr_cdf_dat[i][v] == 0:
+                    if i != 1:
+                        contr_cdf_dat[i][v] = '?'
+        return contr_cdf_dat
+
+    def dat_bytecode_cdf(self):
+        bytecode2txs = self.get_bytecode2txs()
+        bytecode_cdf_dat = defaultdict(dict)
+        for i in range(1, 101):
+            bytecode_cdf_dat[i] = {
+                'airdrop-hunting': 0,
+                'reentrancy': 0,
+                'integer-overflow': 0,
+                'call-injection': 0,
+                'call-after-destruct': 0,
+                'honeypot': 0
+            }
+        for v in bytecode2txs:
+            rows = []
+            for h in bytecode2txs[v]:
+                rows.append((h, len(bytecode2txs[v][h])))
+            rows.sort(reverse=True, key=lambda x: x[1])
+            l = len(rows)
+            for i in range(1, l+1):
+                row = rows[i-1]
+                pos = int(i*100/l) if int(i*100/l) == i * \
+                    100/l else int(i*100/l+1)
+                bytecode_cdf_dat[pos][v] += row[1]*100/len(self.ed.attack_data.vul2txs[v])
+        for i in bytecode_cdf_dat:
+            for v in bytecode_cdf_dat[i]:
+                if bytecode_cdf_dat[i][v] == 0:
+                    if i != 1:
+                        bytecode_cdf_dat[i][v] = '?'
+        return bytecode_cdf_dat
+
+    def get_bytecode2txs(self):
+        bytecode2txs = dict()
+        for v in self.ed.attack_data.contr2txs:
+            bytecode2txs[v] = defaultdict(set)
+            for c in self.ed.attack_data.contr2txs[v]:
+                if c not in self.ed.contract_cache:
+                    continue
+                bytecode_hash = self.ed.contract_cache[c]
+                for tx_hash in self.ed.attack_data.contr2txs[v][c]:
+                    bytecode2txs[v][bytecode_hash].add(tx_hash)
+        return bytecode2txs
 
     def cmp_related_works_wo_vuls(self):
         our_candidates = set()

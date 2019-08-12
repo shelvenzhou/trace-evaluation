@@ -40,6 +40,7 @@ class EvalData(object):
         self.integer_overflow_cve = None
         self.defense_contracts = dict()
 
+        self.month2txs = None
         self.tx_time = dict()
         self.parity_wallet = set()
         self.honeypot_profit_txs = defaultdict(list)
@@ -194,6 +195,8 @@ class EvalData(object):
             'token': defaultdict(dict)
         }
         eth_dollar_loss = defaultdict(dict)
+        month2txs = dict()
+
         for cand in candidates:
             v = cand.type
             details = cand.details
@@ -285,6 +288,10 @@ class EvalData(object):
             if len(targets) == 0:
                 continue
             abnormal_data.vul2txs[v].add(tx_hash)
+            tx_month = tx_time[:7]
+            if tx_month not in month2txs:
+                month2txs[tx_month] = defaultdict(set)
+            month2txs[tx_month][v].add(tx_hash)
             for target in targets:
                 abnormal_data.vul2contrs[v].add(target)
                 if target not in abnormal_data.contr2txs[v]:
@@ -297,6 +304,7 @@ class EvalData(object):
             self.failed_loss = eco_loss
         else:
             self.attack_loss = eco_loss
+            self.month2txs = month2txs
 
     def update_confirmed_vuls(self):
         self.confirmed_vuls = {
