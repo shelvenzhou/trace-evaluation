@@ -3,28 +3,29 @@ import json
 from collections import defaultdict
 
 from transaction_trace.analysis.results import AttackCandidateExporter
+
 from result_filter import ResultFilter
 
 
-def call_injection_extractor(call_injections, call_injection):
+def call_injection_extractor(call_injections, filtered, call_injection):
     for attack in call_injection.details["attacks"]:
         target = attack["entry_edge"][1].split(":")[1]
         call_injections[target].append(call_injection)
 
 
-def reentrancy_extractor(reentrancies, reentrancy):
+def reentrancy_extractor(reentrancies, filtered, reentrancy):
     for attack in reentrancy.details["attacks"]:
         target = attack["entry"].split(":")[1]
         reentrancies[target].append(reentrancy)
 
 
-def integer_overflow_extractor(integer_overflows, integer_overflow):
+def integer_overflow_extractor(integer_overflows, filtered, integer_overflow):
     for attack in integer_overflow.details["attacks"]:
         target = attack["edge"][1].split(":")[1]
         integer_overflows[target].append(integer_overflow)
 
 
-def airdrop_hunting_extractor(airdrop_huntings, airdrop_hunting):
+def airdrop_hunting_extractor(airdrop_huntings, filtered, airdrop_hunting):
     if len(airdrop_hunting.results) == 0:
         airdrop_huntings["unknown"].append(airdrop_hunting)
     else:
@@ -34,14 +35,16 @@ def airdrop_hunting_extractor(airdrop_huntings, airdrop_hunting):
                 airdrop_huntings[token_addr].append(airdrop_hunting)
 
 
-def call_after_destruct_extractor(call_after_destructs, call_after_destruct):
+def call_after_destruct_extractor(call_after_destructs, filtered, call_after_destruct):
     destructed_contract = call_after_destruct.details["suicided_contract"]
     call_after_destructs[destructed_contract].append(call_after_destruct)
 
 
-def honeypot_extractor(honeypots, honeypot):
+def honeypot_extractor(honeypots, filtered, honeypot):
+    contract = honeypot.details["contract"]
     if ResultFilter.honeypot_filter(honeypot):
-        contract = honeypot.details["contract"]
+        filtered[contract].append(honeypot)
+    else:
         honeypots[contract].append(honeypot)
 
 
@@ -84,6 +87,7 @@ class FileLoader:
             raw_data = AttackCandidateExporter.load_candidates(f)
 
         candidates = defaultdict(lambda: defaultdict(list))
+        filtered = defaultdict(lambda: defaultdict(list))
         for attack in raw_data:
-            contract_addr_extractors[attack.type](candidates[attack.type], attack)
-        return candidates
+            contract_addr_extractors[attack.type](candidates[attack.type], filtered[attack.type], attack)
+        return candidates, filtered

@@ -11,5 +11,10 @@ class ResultFilter:
         Filter contract which is definitely not honeypot,
         no matter whether it's confirmed or failed
         """
-        return honeypot.details["status"] == "INITIALIZED" \
-            or honeypot.details["tx_count"] > 20
+        return honeypot.details["tx_count"] > 20 \
+            or len(honeypot.details["init_txs"]) > 3 \
+            or len(honeypot.details["withdraw_txs"]) > 3 \
+            or honeypot.results["bonus"] == 0 \
+            or honeypot.results["profits"] == 0 \
+            or honeypot.details["status"] != "WITHDRAWED" \
+            or (honeypot.details["status"] == "WITHDRAWED" and honeypot.results["left"] > 1000)
