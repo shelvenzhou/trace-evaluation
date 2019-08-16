@@ -1,6 +1,5 @@
 {
     "candidates": [
-        "0xa6ce0f36a2df6c618423480b4f811d57af76e6aa",
         "0x14a4123da9ad21b2215dc0ab6984ec1e89842c6d",
         "0x94485b3e9606fae34b6c04c6c2ff25aec3995f07",
         "0xe1015a79a7d488f8fecf073b187d38c6f1a77368",
@@ -64,7 +63,6 @@
         "0x903f155f2bf707a429c9014c25270a6b0b8f8bb9"
     ],
     "confirmed": [
-        "0xa6ce0f36a2df6c618423480b4f811d57af76e6aa",
         "0x6ef5b9ae723fe059cac71ad620495575d19dac42",
         "0x22c10728343e9d49ef25080f74a223878a3d4052",
         "0x0027449bf0887ca3e431d263ffdefb244d95b555",

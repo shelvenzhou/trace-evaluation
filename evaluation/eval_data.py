@@ -38,12 +38,14 @@ class EvalData(object):
         self.reen_cycle2target = None
         self.integer_overflow_contracts = None
         self.integer_overflow_cve = None
+        self.honeypot_contracts = None
         self.defense_contracts = dict()
+
+        self.related_works_result = None
 
         self.month2txs = None
         self.tx_time = dict()
         self.parity_wallet = set()
-        self.honeypot_profit_txs = defaultdict(list)
 
         self.attack_candidates = None
         self.failed_candidates = None
@@ -85,6 +87,8 @@ class EvalData(object):
                         f.write(bytecode)
 
     def load_data(self):
+        print("loading data")
+
         with open(Config.CONTRACT_CREATE_TIME, 'rb') as f:
             self.create_time = pickle.load(f)
 
@@ -100,11 +104,17 @@ class EvalData(object):
         with open('res/case-study/integer-overflow-contracts.json', 'rb') as f:
             self.integer_overflow_contracts = json.load(f)
 
+        with open('res/case-study/honeypot-contracts.json', 'rb') as f:
+            self.honeypot_contracts = json.load(f)
+
         with open('res/case-study/integer-overflow-cvelist.json', 'rb') as f:
             self.integer_overflow_cve = json.load(f)
 
         with open('res/case-study/open-source-reentrancy.json', 'rb') as f:
             self.open_source_reentrancy = json.load(f)
+
+        with open('res/case-study/related-works-result.json', 'rb') as f:
+            self.related_works_result = json.load(f)
 
         with open('res/base-data/eth_price.json', 'rb') as f:
             self.eth_price = json.load(f)
@@ -137,6 +147,9 @@ class EvalData(object):
     def open_source_contract(self, address):
         if address in self.open_source_contracts:
             return True
+        else:
+            return False
+
         self.read_contract_info(address)
         if self.contract_cache[address]:
             bytecode_hash = self.contract_cache[address]['bytecode_hash']
@@ -203,11 +216,12 @@ class EvalData(object):
             results = cand.results
 
             if v == 'honeypot':
-                continue
-            tx_hash = details['transaction'] if v != 'honeypot' else details['profit_txs'][0]
-            if 'tx_time' in details:
+                tx_hash = details['create_tx']
+                tx_time = details['create_time']
+            else:
+                tx_hash = details['transaction']
                 tx_time = details['tx_time']
-                self.tx_time[tx_hash] = tx_time
+            self.tx_time[tx_hash] = tx_time
 
             targets = []
             if v == 'airdrop-hunting' and details['hunting_time'] > threshold.hunting_time:
@@ -223,14 +237,22 @@ class EvalData(object):
                 for attack in details['attacks']:
                     targets.append(attack['entry_edge'][1].split(':')[1])
             elif v == 'honeypot':
+                target = details['contract']
+                if target not in self.honeypot_contracts['candidates']:
+                    continue
                 targets.append(details['contract'])
-                self.honeypot_profit_txs[details['contract']
-                                         ] = details['profit_txs']
+                eth = float(Web3.fromWei(results['profits'], 'ether'))
+                if target not in eco_loss['ether']['honeypot']:
+                    eco_loss['ether']['honeypot'][target] = 0
+                    eth_dollar_loss['honeypot'][target] = 0
+                eco_loss['ether']['honeypot'][target] += eth
+                eth_dollar_loss['honeypot'][target] += eth * self.eth_price[tx_time[:10]]
             elif v == 'integer-overflow' :
                 if failed_data:
                     for attack in details['attacks']:
                         targets.append(attack['edge'][1].split(':')[1])
                 else:
+                    results['profits'] = results.copy()
                     for node in results['profits']:
                         for result_type in results['profits'][node]:
                             if result_type.split(':')[0] == 'TOKEN_TRANSFER_EVENT':
@@ -247,6 +269,8 @@ class EvalData(object):
                     if intention['iter_num'] > threshold.iter_num:
                         cycle = intention['cycle']
                         addrs = str(tuple(sorted(cycle)))
+                        if intention['iter_num'] == 1.5 and '0xd654bdd32fc99471455e86c2e7f7d7b6437e9179' not in addrs:
+                            continue
                         if addrs not in self.reen_cycle2target:
                             print('reentrancy', tx_hash, addrs)
                             embed()
@@ -270,20 +294,27 @@ class EvalData(object):
                 if t not in eco_loss['ether']['reentrancy']:
                     eco_loss['ether']['reentrancy'][t] = 0
                     eth_dollar_loss['reentrancy'][t] = 0
-                eth = int(Web3.fromWei(eth, 'ether'))
+                eth = float(Web3.fromWei(eth, 'ether'))
                 eco_loss['ether']['reentrancy'][t] += eth
                 eth_dollar_loss['reentrancy'][t] += eth * self.eth_price[tx_time[:10]]
             elif v == 'call-after-destruct' and not failed_data:
                 suicided_contract = details['suicided_contract']
                 self.cad.vul2txs[v].add(tx_hash)
                 self.cad.vul2contrs[v].add(suicided_contract)
-                if 'ETHER_TRANSFER' in results:
-                    if suicided_contract not in eco_loss['ether']['call-after-destruct']:
-                        eco_loss['ether']['call-after-destruct'][suicided_contract] = 0
-                        eth_dollar_loss['call-after-destruct'][suicided_contract] = 0
-                    eth = int(Web3.fromWei(results['ETHER_TRANSFER'], 'ether'))
-                    eco_loss['ether']['call-after-destruct'][suicided_contract] += eth
-                    # eth_dollar_loss['call-after-destruct'][suicided_contract] += eth * self.eth_price[tx_time[:10]]
+                for result_type in results:
+                    rt = result_type.split(':')[0]
+                    if rt == 'ETHER_TRANSFER':
+                        if suicided_contract not in eco_loss['ether']['call-after-destruct']:
+                            eco_loss['ether']['call-after-destruct'][suicided_contract] = 0
+                            eth_dollar_loss['call-after-destruct'][suicided_contract] = 0
+                        eth = float(Web3.fromWei(results['ETHER_TRANSFER'], 'ether'))
+                        eco_loss['ether']['call-after-destruct'][suicided_contract] += eth
+                        eth_dollar_loss['call-after-destruct'][suicided_contract] += eth * self.eth_price[tx_time[:10]]
+                    elif rt == 'TOKEN_TRANSFER':
+                        token = result_type.split(':')[1]
+                        if token not in eco_loss['token']['call-after-destruct']:
+                            eco_loss['token']['call-after-destruct'][token] = 0
+                        eco_loss['token']['call-after-destruct'][token] += results[result_type]
 
             if len(targets) == 0:
                 continue
@@ -304,6 +335,7 @@ class EvalData(object):
             self.failed_loss = eco_loss
         else:
             self.attack_loss = eco_loss
+            self.eth_dollar_loss = eth_dollar_loss
             self.month2txs = month2txs
 
     def update_confirmed_vuls(self):
@@ -311,5 +343,6 @@ class EvalData(object):
             'call-injection': self.parity_wallet,
             'reentrancy': self.attack_data.vul2contrs_open_sourced['reentrancy'],
             'integer-overflow': self.integer_overflow_contracts['confirmed'],
-            'airdrop-hunting': self.attack_data.vul2contrs_open_sourced['airdrop-hunting']
+            'airdrop-hunting': self.attack_data.vul2contrs_open_sourced['airdrop-hunting'],
+            'honeypot': self.honeypot_contracts['confirmed']
         }
