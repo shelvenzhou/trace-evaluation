@@ -2,13 +2,11 @@ class Config:
 
     related_work_result_dir = "res/related-works"
 
-    CONTRACT_CREATE_TIME = '/home/xiangjie/logs/pickles/contract_create_time'
+    CONTRACT_CREATE_TIME = 'local_res/contract_create_time'
 
-    REENTRANCY_ADDRS_MAP = '/home/xiangjie/logs/pickles/reen_addrs2target'
+    CI_LOG_FILE = 'local_res/call-injection-analyzer-20190607031718.log'
 
-    CI_LOG_FILE = '/home/xiangjie/logs/call-injection-analyzer-20190607031718.log'
-
-    CONTRACT_CACHE_PICKLE_FILE = '/home/xiangjie/logs/pickles/contract_cache'
+    CONTRACT_CACHE_PICKLE_FILE = 'local_res/contract_cache'
 
 
     token_valuable = [
@@ -47,7 +45,8 @@ class Config:
         'ZEUS': '2017-03-15 09:45:39',
         'Oyente': '2016-05-05',
         'Securify': '2017-03-04 05:31:21',
-        'HoneyBadger': '2018-10-12'
+        'HoneyBadger': '2018-10-12',
+        'teEther': '2017-11-30'
     }
 
     multi_transfer_function = {

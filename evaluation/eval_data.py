@@ -6,9 +6,11 @@ from config import Config
 
 import pickle
 import json
+import csv
 from collections import defaultdict
 from web3 import Web3
 import os
+from IPython import embed
 
 
 class AbnormalData(object):
@@ -20,7 +22,8 @@ class AbnormalData(object):
 
 class EvalData(object):
     def __init__(self, attack_log_path, failed_attack_log_path, db_passwd):
-        self.contract_code_db = ContractCode(passwd=db_passwd)
+        # self.contract_code_db = ContractCode(passwd=db_passwd)
+        self.contract_code_db = None
         self.evm_executor = EVMExecutor()
 
         self.attack_log_path = attack_log_path
@@ -28,20 +31,28 @@ class EvalData(object):
 
         self.contract_cache = dict()
         self.source_code_cache = dict()
+        self.open_source_contracts = None
         self.create_time = None
+        self.eth_price = None
 
         self.reen_cycle2target = None
         self.integer_overflow_contracts = None
         self.integer_overflow_cve = None
+        self.honeypot_contracts = None
+        self.defense_contracts = dict()
 
+        self.related_works_result = None
+
+        self.month2txs = None
+        self.tx_time = dict()
         self.parity_wallet = set()
-        self.honeypot_profit_txs = defaultdict(list)
 
         self.attack_candidates = None
         self.failed_candidates = None
 
         self.attack_loss = None
         self.failed_loss = None
+        self.eth_dollar_loss = None
 
         self.cad = AbnormalData()
         self.attack_data = AbnormalData()
@@ -51,11 +62,11 @@ class EvalData(object):
 
         self.load_data()
 
-    def __del__(self):
-        print('dumping contract cache')
-        with open('/home/xiangjie/logs/pickles/contract_cache', 'wb') as f:
-            pickle.dump({'contract_cache': self.contract_cache,
-                            'source_code_cache': self.source_code_cache}, f)
+    # def __del__(self):
+    #     print('dumping contract cache')
+    #     with open('local_res/contract_cache', 'wb') as f:
+    #         pickle.dump({'contract_cache': self.contract_cache,
+    #                         'source_code_cache': self.source_code_cache}, f)
 
     def dump_bytecode(self, dump_path):
         if not os.path.exists(dump_path):
@@ -76,6 +87,8 @@ class EvalData(object):
                         f.write(bytecode)
 
     def load_data(self):
+        print("loading data")
+
         with open(Config.CONTRACT_CREATE_TIME, 'rb') as f:
             self.create_time = pickle.load(f)
 
@@ -91,8 +104,38 @@ class EvalData(object):
         with open('res/case-study/integer-overflow-contracts.json', 'rb') as f:
             self.integer_overflow_contracts = json.load(f)
 
+        with open('res/case-study/honeypot-contracts.json', 'rb') as f:
+            self.honeypot_contracts = json.load(f)
+
         with open('res/case-study/integer-overflow-cvelist.json', 'rb') as f:
             self.integer_overflow_cve = json.load(f)
+
+        with open('res/case-study/open-source-reentrancy.json', 'rb') as f:
+            self.open_source_reentrancy = json.load(f)
+
+        with open('res/case-study/related-works-result.json', 'rb') as f:
+            self.related_works_result = json.load(f)
+
+        with open('res/base-data/eth_price.json', 'rb') as f:
+            self.eth_price = json.load(f)
+
+        with open('res/defense_contracts/contracts_with_source.csv', 'r') as f:
+            self.open_source_contracts = set([i[0] for i in csv.reader(f)])
+
+        with open('res/defense_contracts/can_distr.csv', 'r') as f:
+            self.defense_contracts['can_distr'] = [i[0] for i in csv.reader(f)]
+
+        with open('res/defense_contracts/is_human.csv', 'r') as f:
+            self.defense_contracts['is_human'] = [i[0] for i in csv.reader(f)]
+
+        with open('res/defense_contracts/non_reentrant.csv', 'r') as f:
+            self.defense_contracts['non_reentrant'] = [i[0] for i in csv.reader(f)]
+
+        with open('res/defense_contracts/only_owner.csv', 'r') as f:
+            self.defense_contracts['only_owner'] = [i[0] for i in csv.reader(f)]
+
+        with open('res/defense_contracts/safemath.csv', 'r') as f:
+            self.defense_contracts['safemath'] = [i[0] for i in csv.reader(f)]
 
         if not os.path.exists(Config.CONTRACT_CACHE_PICKLE_FILE):
             return
@@ -102,6 +145,11 @@ class EvalData(object):
             self.source_code_cache = o['source_code_cache']
 
     def open_source_contract(self, address):
+        if address in self.open_source_contracts:
+            return True
+        else:
+            return False
+
         self.read_contract_info(address)
         if self.contract_cache[address]:
             bytecode_hash = self.contract_cache[address]['bytecode_hash']
@@ -159,20 +207,28 @@ class EvalData(object):
             'ether': defaultdict(dict),
             'token': defaultdict(dict)
         }
+        eth_dollar_loss = defaultdict(dict)
+        month2txs = dict()
+
         for cand in candidates:
             v = cand.type
             details = cand.details
             results = cand.results
 
             if v == 'honeypot':
-                continue
-            tx_hash = details['transaction'] if v != 'honeypot' else details['profit_txs'][0]
+                tx_hash = details['create_tx']
+                tx_time = details['create_time']
+            else:
+                tx_hash = details['transaction']
+                tx_time = details['tx_time']
+            self.tx_time[tx_hash] = tx_time
+
             targets = []
             if v == 'airdrop-hunting' and details['hunting_time'] > threshold.hunting_time:
                 for node in results:
                     for result_type in results[node]:
                         if result_type.split(':')[0] == 'TOKEN_TRANSFER_EVENT':
-                            token = result_type.split(':')[-1]
+                            token = result_type.split(':')[1]
                             targets.append(token)
                             if token not in eco_loss['token']['airdrop-hunting']:
                                 eco_loss['token']['airdrop-hunting'][token] = 0
@@ -181,32 +237,48 @@ class EvalData(object):
                 for attack in details['attacks']:
                     targets.append(attack['entry_edge'][1].split(':')[1])
             elif v == 'honeypot':
+                target = details['contract']
+                if target not in self.honeypot_contracts['candidates']:
+                    continue
                 targets.append(details['contract'])
-                self.honeypot_profit_txs[details['contract']
-                                         ] = details['profit_txs']
-            elif v == 'integer-overflow':
-                for node in results:
-                    for result_type in results[node]:
-                        if result_type.split(':')[0] == 'TOKEN_TRANSFER_EVENT':
-                            token = result_type.split(':')[-1]
-                            targets.append(token)
-                            if token not in eco_loss['token']['integer-overflow']:
-                                eco_loss['token']['integer-overflow'][token] = 0
-                            eco_loss['token']['integer-overflow'][token] += results[node][result_type]
+                eth = float(Web3.fromWei(results['profits'], 'ether'))
+                if target not in eco_loss['ether']['honeypot']:
+                    eco_loss['ether']['honeypot'][target] = 0
+                    eth_dollar_loss['honeypot'][target] = 0
+                eco_loss['ether']['honeypot'][target] += eth
+                eth_dollar_loss['honeypot'][target] += eth * self.eth_price[tx_time[:10]]
+            elif v == 'integer-overflow' :
+                if failed_data:
+                    for attack in details['attacks']:
+                        targets.append(attack['edge'][1].split(':')[1])
+                else:
+                    results['profits'] = results.copy()
+                    for node in results['profits']:
+                        for result_type in results['profits'][node]:
+                            if result_type.split(':')[0] == 'TOKEN_TRANSFER_EVENT':
+                                token = result_type.split(':')[1]
+                                amount = results['profits'][node][result_type]
+                                if token not in self.integer_overflow_contracts['candidates'] or amount <= threshold.overflow_thr:
+                                    continue
+                                targets.append(token)
+                                if token not in eco_loss['token']['integer-overflow']:
+                                    eco_loss['token']['integer-overflow'][token] = 0
+                                eco_loss['token']['integer-overflow'][token] += results['profits'][node][result_type]
             elif v == 'reentrancy':
-                t = None
                 for intention in details['attacks']:
                     if intention['iter_num'] > threshold.iter_num:
                         cycle = intention['cycle']
                         addrs = str(tuple(sorted(cycle)))
+                        if intention['iter_num'] == 1.5 and '0xd654bdd32fc99471455e86c2e7f7d7b6437e9179' not in addrs:
+                            continue
                         if addrs not in self.reen_cycle2target:
-                            print(tx_hash, addrs)
-                            import IPython;IPython.embed()
+                            print('reentrancy', tx_hash, addrs)
+                            embed()
                         else:
                             t = self.reen_cycle2target[addrs]
+                            if t == '0xc6b330df38d6ef288c953f1f2835723531073ce2':
+                                continue
                             targets.append(t)
-                if t is None:
-                    continue
                 eth = 0
                 for node in results:
                     for result_type in results[node]:
@@ -215,21 +287,42 @@ class EvalData(object):
                             if results[node][result_type] > eth:
                                 eth = results[node][result_type]
                         elif rt == 'TOKEN_TRANSFER_EVENT':
-                            token = result_type.split(':')[-1]
+                            token = result_type.split(':')[1]
                             if token not in eco_loss['token']['reentrancy']:
                                 eco_loss['token']['reentrancy'][token] = 0
                             eco_loss['token']['reentrancy'][token] += results[node][result_type]
                 if t not in eco_loss['ether']['reentrancy']:
                     eco_loss['ether']['reentrancy'][t] = 0
-                    eco_loss['ether']['reentrancy'][t] += Web3.fromWei(eth, 'ether')
+                    eth_dollar_loss['reentrancy'][t] = 0
+                eth = float(Web3.fromWei(eth, 'ether'))
+                eco_loss['ether']['reentrancy'][t] += eth
+                eth_dollar_loss['reentrancy'][t] += eth * self.eth_price[tx_time[:10]]
             elif v == 'call-after-destruct' and not failed_data:
                 suicided_contract = details['suicided_contract']
                 self.cad.vul2txs[v].add(tx_hash)
                 self.cad.vul2contrs[v].add(suicided_contract)
+                for result_type in results:
+                    rt = result_type.split(':')[0]
+                    if rt == 'ETHER_TRANSFER':
+                        if suicided_contract not in eco_loss['ether']['call-after-destruct']:
+                            eco_loss['ether']['call-after-destruct'][suicided_contract] = 0
+                            eth_dollar_loss['call-after-destruct'][suicided_contract] = 0
+                        eth = float(Web3.fromWei(results['ETHER_TRANSFER'], 'ether'))
+                        eco_loss['ether']['call-after-destruct'][suicided_contract] += eth
+                        eth_dollar_loss['call-after-destruct'][suicided_contract] += eth * self.eth_price[tx_time[:10]]
+                    elif rt == 'TOKEN_TRANSFER':
+                        token = result_type.split(':')[1]
+                        if token not in eco_loss['token']['call-after-destruct']:
+                            eco_loss['token']['call-after-destruct'][token] = 0
+                        eco_loss['token']['call-after-destruct'][token] += results[result_type]
 
             if len(targets) == 0:
                 continue
             abnormal_data.vul2txs[v].add(tx_hash)
+            tx_month = tx_time[:7]
+            if tx_month not in month2txs:
+                month2txs[tx_month] = defaultdict(set)
+            month2txs[tx_month][v].add(tx_hash)
             for target in targets:
                 abnormal_data.vul2contrs[v].add(target)
                 if target not in abnormal_data.contr2txs[v]:
@@ -242,11 +335,14 @@ class EvalData(object):
             self.failed_loss = eco_loss
         else:
             self.attack_loss = eco_loss
+            self.eth_dollar_loss = eth_dollar_loss
+            self.month2txs = month2txs
 
     def update_confirmed_vuls(self):
         self.confirmed_vuls = {
             'call-injection': self.parity_wallet,
             'reentrancy': self.attack_data.vul2contrs_open_sourced['reentrancy'],
             'integer-overflow': self.integer_overflow_contracts['confirmed'],
-            'airdrop-hunting': self.attack_data.vul2contrs_open_sourced['airdrop-hunting']
+            'airdrop-hunting': self.attack_data.vul2contrs_open_sourced['airdrop-hunting'],
+            'honeypot': self.honeypot_contracts['confirmed']
         }

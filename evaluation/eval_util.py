@@ -7,6 +7,7 @@ from related_works import RelatedWorks
 
 from collections import defaultdict
 from datetime import datetime
+from dateutil.relativedelta import relativedelta
 
 
 
@@ -21,6 +22,97 @@ class EvalUtil(object):
     def __init__(self, eval_data):
         self.ed = eval_data
         self.related_works = RelatedWorks()
+
+    def dat_month2txs(self):
+        begin = datetime(2015, 8, 1, 0, 0)
+        month2txs_dat = dict()
+        while begin < datetime(2019, 4, 1, 0, 0):
+            month2txs_dat[DatetimeUtils.month_to_str(begin)] = {
+                'airdrop-hunting': 0,
+                'reentrancy': 0,
+                'integer-overflow': 0,
+                'call-injection': 0,
+                'call-after-destruct': 0,
+                'honeypot': 0
+            }
+            begin += relativedelta(months=1)
+
+        for m in self.ed.month2txs:
+            for v in self.ed.month2txs[m]:
+                month2txs_dat[m][v] = len(self.ed.month2txs[m[v]])
+
+        return month2txs_dat
+
+    def dat_contract_cdf(self):
+        contr_cdf_dat = defaultdict(dict)
+        for i in range(1, 101):
+            contr_cdf_dat[i] = {
+                'airdrop-hunting': 0,
+                'reentrancy': 0,
+                'integer-overflow': 0,
+                'call-injection': 0,
+                'call-after-destruct': 0,
+                'honeypot': 0
+            }
+        for v in self.ed.attack_data.contr2txs:
+            rows = []
+            for c in self.ed.attack_data.contr2txs[v]:
+                rows.append((c, len(self.ed.attack_data.contr2txs[v][c])))
+            rows.sort(reverse=True, key=lambda x: x[1])
+            l = len(rows)
+            for i in range(1, l+1):
+                row = rows[i-1]
+                pos = int(i*100/l) if int(i*100/l) == i * \
+                    100/l else int(i*100/l+1)
+                contr_cdf_dat[pos][v] += row[1]*100/len(self.ed.attack_data.vul2txs[v])
+        for i in contr_cdf_dat:
+            for v in contr_cdf_dat[i]:
+                if contr_cdf_dat[i][v] == 0:
+                    if i != 1:
+                        contr_cdf_dat[i][v] = '?'
+        return contr_cdf_dat
+
+    def dat_bytecode_cdf(self):
+        bytecode2txs = self.get_bytecode2txs()
+        bytecode_cdf_dat = defaultdict(dict)
+        for i in range(1, 101):
+            bytecode_cdf_dat[i] = {
+                'airdrop-hunting': 0,
+                'reentrancy': 0,
+                'integer-overflow': 0,
+                'call-injection': 0,
+                'call-after-destruct': 0,
+                'honeypot': 0
+            }
+        for v in bytecode2txs:
+            rows = []
+            for h in bytecode2txs[v]:
+                rows.append((h, len(bytecode2txs[v][h])))
+            rows.sort(reverse=True, key=lambda x: x[1])
+            l = len(rows)
+            for i in range(1, l+1):
+                row = rows[i-1]
+                pos = int(i*100/l) if int(i*100/l) == i * \
+                    100/l else int(i*100/l+1)
+                bytecode_cdf_dat[pos][v] += row[1]*100/len(self.ed.attack_data.vul2txs[v])
+        for i in bytecode_cdf_dat:
+            for v in bytecode_cdf_dat[i]:
+                if bytecode_cdf_dat[i][v] == 0:
+                    if i != 1:
+                        bytecode_cdf_dat[i][v] = '?'
+        return bytecode_cdf_dat
+
+    def get_bytecode2txs(self):
+        bytecode2txs = dict()
+        for v in self.ed.attack_data.contr2txs:
+            bytecode2txs[v] = defaultdict(set)
+            for c in self.ed.attack_data.contr2txs[v]:
+                if c not in self.ed.contract_cache:
+                    continue
+                bytecode_hash = self.ed.contract_cache[c]
+                for tx_hash in self.ed.attack_data.contr2txs[v][c]:
+                    bytecode2txs[v][bytecode_hash].add(tx_hash)
+        return bytecode2txs
 
     def cmp_related_works_wo_vuls(self):
         our_candidates = set()
@@ -138,45 +230,30 @@ class EvalUtil(object):
         print("{} of confirmed adversarial  transactions  are  targeting  {}  vulnerabilities".format(
             len(missed_txs)/len(succeed_txs), len(missed_vuls)))
 
-        # txs = set()
-        # for v in self.attack_data.vul2txs:
-        #     for tx in self.attack_data.vul2txs[v]:
-        #         txs.add(tx)
-        # for v in self.failed_data.vul2txs:
-        #     for tx in self.failed_data.vul2txs[v]:
-        #         txs.add(tx)
-        # tx_time = dict()
-        # db = EthereumDatabase('/mnt/data/bigquery/ethereum_transactions', 'transactions')
-        # for con in db.get_all_connnections():
-        #     print(con)
-        #     for row in con.read('transactions', '*'):
-        #         tx_hash = row['hash']
-        #         if tx_hash in txs:
-        #             tx_time[tx_hash] = row['block_timestamp']
 
-        # attemp_txs = set()
-        # confirm_txs = set()
-        # for v in ('reentrancy', 'call-injection'):
-        #     for tx in self.attack_data.vul2txs[v]:
-        #         if tx_time[tx] > datetime(2015, 8, 1, 0, 0) and tx_time[tx] < datetime(2017, 8, 1, 0, 0):
-        #             attemp_txs.add(tx)
-        #             if tx in succeed_txs:
-        #                 confirm_txs.add(tx)
-        #     for tx in self.failed_data.vul2txs[v]:
-        #         if tx_time[tx] > datetime(2015, 8, 1, 0, 0) and tx_time[tx] < datetime(2017, 8, 1, 0, 0):
-        #             attemp_txs.add(tx)
+        attemp_txs = set()
+        confirm_txs = set()
+        for v in ('reentrancy', 'call-injection'):
+            for tx in self.ed.attack_data.vul2txs[v]:
+                if self.ed.tx_time[tx] > "2015-08-01" and self.ed.tx_time[tx] < "2017-08-01":
+                    attemp_txs.add(tx)
+                    if tx in succeed_txs:
+                        confirm_txs.add(tx)
+            for tx in self.ed.failed_data.vul2txs[v]:
+                if self.ed.tx_time[tx] > "2015-08-01" and self.ed.tx_time[tx] < "2017-08-01":
+                    attemp_txs.add(tx)
 
-        # print("{} attemped, {} confirmed between 2015.8 and 2017.8".format(len(attemp_txs)/len(attempted_txs), len(confirm_txs)/len(succeed_txs)))
+        print("{} attemped, {} confirmed between 2015.8 and 2017.8".format(len(attemp_txs)/len(attempted_txs), len(confirm_txs)/len(succeed_txs)))
 
-        # attemp_txs = set()
-        # confirm_txs = set()
-        # for v in ('airdrop-hunting', 'integer-overflow'):
-        #     for tx in self.attack_data.vul2txs[v]:
-        #         if tx_time[tx] > datetime(2017, 9, 1, 0, 0) and tx_time[tx] < datetime(2019, 3, 1, 0, 0):
-        #             attemp_txs.add(tx)
-        #             if tx in succeed_txs:
-        #                 confirm_txs.add(tx)
-        #     for tx in self.failed_data.vul2txs[v]:
-        #         if tx_time[tx] > datetime(2017, 9, 1, 0, 0) and tx_time[tx] < datetime(2019, 3, 1, 0, 0):
-        #             attemp_txs.add(tx)
-        # print("{} attemped, {} confirmed between 2017.9 and 2019.3".format(len(attemp_txs)/len(attempted_txs), len(confirm_txs)/len(succeed_txs)))
+        attemp_txs = set()
+        confirm_txs = set()
+        for v in ('airdrop-hunting', 'integer-overflow'):
+            for tx in self.ed.attack_data.vul2txs[v]:
+                if self.ed.tx_time[tx] > "2017-09-01" and self.ed.tx_time[tx] < "2019-03-01":
+                    attemp_txs.add(tx)
+                    if tx in succeed_txs:
+                        confirm_txs.add(tx)
+            for tx in self.ed.failed_data.vul2txs[v]:
+                if self.ed.tx_time[tx] > "2017-09-01" and self.ed.tx_time[tx] < "2019-03-01":
+                    attemp_txs.add(tx)
+        print("{} attemped, {} confirmed between 2017.9 and 2019.3".format(len(attemp_txs)/len(attempted_txs), len(confirm_txs)/len(succeed_txs)))
