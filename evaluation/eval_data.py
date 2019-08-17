@@ -280,6 +280,7 @@ class EvalData(object):
                                     eco_loss['token']['integer-overflow'][token] = 0
                                 eco_loss['token']['integer-overflow'][token] += results['profits'][node][result_type]
             elif v == 'reentrancy':
+                target = None
                 for intention in details['attacks']:
                     if intention['iter_num'] > threshold.iter_num:
                         cycle = intention['cycle']
@@ -295,6 +296,8 @@ class EvalData(object):
                                 continue
                             target = t
                             targets.append(target)
+                if target == None:
+                    continue
                 eth = 0
                 for node in results:
                     for result_type in results[node]:
