@@ -41,7 +41,7 @@ class EvalUtil(object):
 
         for m in self.ed.month2txs:
             for v in self.ed.month2txs[m]:
-                month2txs_dat[m][v] = len(self.ed.month2txs[m[v]])
+                month2txs_dat[m][v] = len(self.ed.month2txs[m][v])
 
         return month2txs_dat
 
@@ -235,13 +235,13 @@ class EvalUtil(object):
 
         oveflow_ztxs = set()
         for c in self.zday['integer-overflow']:
-            for tx in self.ed.contr2txs['integer-overflow'][c]:
+            for tx in self.ed.attack_data.contr2txs['integer-overflow'][c]:
                 oveflow_ztxs.add(tx)
 
-        local_attemp_txs_rc = {'all': set(), 'rc': set}
-        local_confirm_txs_rc = {'all': set(), 'rc': set}
-        local_attemp_txs_ai = {'all': set(), 'ai': set}
-        local_confirm_txs_ai = {'all': set(), 'ai': set}
+        local_attemp_txs_rc = {'all': set(), 'rc': set()}
+        local_confirm_txs_rc = {'all': set(), 'rc': set()}
+        local_attemp_txs_ai = {'all': set(), 'ai': set()}
+        local_confirm_txs_ai = {'all': set(), 'ai': set()}
         for v in self.ed.attack_data.vul2txs:
             for tx in self.ed.attack_data.vul2txs[v]:
                 if self.ed.tx_time[tx] > "2015-08-01" and self.ed.tx_time[tx] < "2017-08-01":
@@ -268,7 +268,9 @@ class EvalUtil(object):
 
         print("{} attemped, {} confirmed between 2015.8 and 2017.8".format(len(local_attemp_txs_rc['rc'])/len(local_attemp_txs_rc['all']), len(local_confirm_txs_rc['rc'])/len(local_confirm_txs_rc['all'])))
 
-        print("{} attemped, {} confirmed between 2017.9 and 2019.3".format(len(local_attemp_txs_ai['rc'])/len(local_attemp_txs_ai['all']), len(local_confirm_txs_ai['all'])/len(local_confirm_txs_ai['all'])))
+        print("{} attemped, {} confirmed between 2017.9 and 2019.3".format(len(local_attemp_txs_ai['ai'])/len(local_attemp_txs_ai['all']), len(local_confirm_txs_ai['ai'])/len(local_confirm_txs_ai['all'])))
+
+        import IPython;IPython.embed()
 
         # incident_txs = set()
         # incident_contracts = set()

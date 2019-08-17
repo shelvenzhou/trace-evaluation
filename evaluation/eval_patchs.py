@@ -101,6 +101,7 @@ class EvalPatchs(object):
         return eth_lost
 
     def replace_call_injection_data(self, abnormal_data, tx_time):
+        month2txs
         abnormal_data.vul2txs['call-injection'].clear()
         abnormal_data.vul2contrs['call-injection'].clear()
         abnormal_data.contr2txs['call-injection'].clear()
