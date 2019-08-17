@@ -20,7 +20,7 @@ class RelatedWorksRunner:
         if not os.path.exists(outputs_dir):
             os.mkdir(outputs_dir)
         for v in dirs:
-            if v not in  ('call-injection'):
+            if v not in vulnerability_mapping[name].values():
                 continue
             print("running on {}".format(v))
             vp = os.path.join(self.bytecodes_path, v)
@@ -33,26 +33,27 @@ class RelatedWorksRunner:
                     os.mkdir(output_dir)
                 output_file = os.path.join(output_dir, "{}".format(address))
                 print(bytecode_file)
-                re = os.popen(cmd.format(target, output_file))
-                print(re.read())
+                if not os.path.exists(output_file):
+                    re = os.popen(cmd.format(target, output_file))
+                    print(re.read())
 
     def run_mythril(self):
         cmd = "myth analyze -a {} -o json > {} --execution-timeout 120"
-        self.run(cmd, 'mythril', addr=True)
+        self.run(cmd, 'Mythril', addr=True)
 
     def run_teether(self):
         cmd = "python3 /home/xiangjie/teether/bin/gen_exploit.py {} 0x1234 0x1000 +1000 {}"
-        self.run(cmd, 'teether')
+        self.run(cmd, 'teEther')
 
     def run_securify(self):
         cmd = "java -jar /home/xiangjie/securify/build/libs/securify.jar -fh {} --livestatusfile {}"
-        self.run(cmd, 'securify')
+        self.run(cmd, 'Securify')
 
     def run_oyente(self):
         # docker_cmd = "sudo docker run -i -t -v ~/logs/evaluation:/evaluation luongnguyen/oyente"
         cmd = "python /oyente/oyente/oyente.py -s /evaluation/bytecodes/reentrancy/{} -b > /evaluation/oyente/reentrancy/{} 2>&1"
 
-        print(time.ctime(), 'oyente')
+        print(time.ctime(), 'Oyente')
         for bytecode_file in os.listdir("/evaluation/bytecodes/reentrancy"):
             targte = bytecode_file
             address = bytecode_file.strip('.hex')

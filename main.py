@@ -13,14 +13,13 @@ def run_related_works():
 if __name__ == "__main__":
     # run_related_works()
 
-    ed = EvalData('/Users/jay/Desktop/w/logs/attack-candidates-20190813165526.log', '/Users/jay/Desktop/w/logs/failed-attacks-20190813165526.log', 'orzorz')
-    ep = EvalPatchs(ed)
+    # ed = EvalData('/home/xiangjie/logs/attack-candidates-20190813165526.log', '/home/xiangjie/logs/failed-attacks-20190813165526.log', 'orzorz')
+    # ep = EvalPatchs(ed)
 
-    # ep.move_airdrop_data_from_failed()
-    ed.extract_data(Thresholds(3, 1, 10**72), Thresholds(0, 0, 0))
-    ep.replace_call_injection_data(ed.attack_data, ed.tx_time)
-    ed.update_confirmed_vuls()
-    eu = EvalUtil(ed)
-    eu.update_zday()
+    # ed.extract_data(Thresholds(3, 1, 10**72), Thresholds(0, 0, 0))
+    # ep.replace_call_injection_data(ed.attack_data, ed.tx_time)
+    # ed.update_confirmed_vuls()
+    # eu = EvalUtil(ed)
+    # eu.update_zday()
 
     embed()

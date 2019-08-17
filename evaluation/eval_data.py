@@ -24,8 +24,8 @@ class AbnormalData(object):
 
 class EvalData(object):
     def __init__(self, attack_log_path, failed_attack_log_path, db_passwd):
-        # self.contract_code_db = ContractCode(passwd=db_passwd)
-        self.contract_code_db = None
+        self.contract_code_db = ContractCode(passwd=db_passwd)
+        # self.contract_code_db = None
         self.evm_executor = EVMExecutor()
 
         self.attack_log_path = attack_log_path
@@ -57,7 +57,6 @@ class EvalData(object):
         self.eth_dollar_loss = None
         self.three_months_loss = {'ether': defaultdict(dict), 'token': defaultdict(dict)}
 
-        self.cad = AbnormalData()
         self.attack_data = AbnormalData()
         self.failed_data = AbnormalData()
 
@@ -65,11 +64,11 @@ class EvalData(object):
 
         self.load_data()
 
-    # def __del__(self):
-    #     print('dumping contract cache')
-    #     with open('local_res/contract_cache', 'wb') as f:
-    #         pickle.dump({'contract_cache': self.contract_cache,
-    #                         'source_code_cache': self.source_code_cache}, f)
+    def dump_cache(self):
+        print('dumping contract cache')
+        with open('local_res/contract_cache', 'wb') as f:
+            pickle.dump({'contract_cache': self.contract_cache,
+                            'source_code_cache': self.source_code_cache}, f)
 
     def dump_bytecode(self, dump_path):
         if not os.path.exists(dump_path):
@@ -315,13 +314,9 @@ class EvalData(object):
                 eco_loss['ether']['reentrancy'][target] += eth
                 eth_dollar_loss['reentrancy'][target] += eth * self.eth_price[tx_time[:10]]
                 self.time_gap_loss(tx_time, tx_hash, target, eth, 'ether', v, 3)
-            elif v == 'call-after-destruct' and not failed_data:
+            elif v == 'call-after-destruct':
                 suicided_contract = details['suicided_contract']
-                self.cad.vul2txs[v].add(tx_hash)
-                self.cad.vul2contrs[v].add(suicided_contract)
-                if suicided_contract not in self.cad.contr2txs[v]:
-                    self.cad.contr2txs[v][suicided_contract] = set()
-                self.cad.contr2txs[v][suicided_contract].add(tx_hash)
+                targets.append(suicided_contract)
                 for result_type in results:
                     rt = result_type.split(':')[0]
                     if rt == 'ETHER_TRANSFER':
@@ -364,7 +359,7 @@ class EvalData(object):
         self.confirmed_vuls = {
             'call-injection': set(self.parity_wallet),
             'reentrancy': self.attack_data.vul2contrs_open_sourced['reentrancy'],
-            'call-after-destruct': self.cad.vul2contrs['call-after-destruct'],
+            'call-after-destruct': self.attack_data.vul2contrs['call-after-destruct'],
             'integer-overflow': set(self.integer_overflow_contracts['confirmed']),
             'airdrop-hunting': self.attack_data.vul2contrs_open_sourced['airdrop-hunting'],
             'honeypot': set(self.honeypot_contracts['confirmed'])
