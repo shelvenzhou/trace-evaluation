@@ -24,8 +24,8 @@ class AbnormalData(object):
 
 class EvalData(object):
     def __init__(self, attack_log_path, failed_attack_log_path, db_passwd):
-        self.contract_code_db = ContractCode(passwd=db_passwd)
-        # self.contract_code_db = None
+        # self.contract_code_db = ContractCode(passwd=db_passwd)
+        self.contract_code_db = None
         self.evm_executor = EVMExecutor()
 
         self.attack_log_path = attack_log_path
@@ -246,7 +246,8 @@ class EvalData(object):
                             if token not in eco_loss['token']['airdrop-hunting']:
                                 eco_loss['token']['airdrop-hunting'][token] = 0
                             eco_loss['token']['airdrop-hunting'][token] += results[node][result_type]
-                            self.time_gap_loss(tx_time, tx_hash, token, results[node][result_type], 'token', v, 3)
+                            if not failed_data:
+                                self.time_gap_loss(tx_time, tx_hash, token, results[node][result_type], 'token', v, 3)
             elif v == 'call-injection':
                 for attack in details['attacks']:
                     targets.append(attack['entry_edge'][1].split(':')[1])
@@ -261,7 +262,8 @@ class EvalData(object):
                     eth_dollar_loss['honeypot'][target] = 0
                 eco_loss['ether']['honeypot'][target] += eth
                 eth_dollar_loss['honeypot'][target] += eth * self.eth_price[tx_time[:10]]
-                self.time_gap_loss(tx_time, tx_hash, target, eth, 'ether', v, 3)
+                if not failed_data:
+                    self.time_gap_loss(tx_time, tx_hash, target, eth, 'ether', v, 3)
             elif v == 'integer-overflow' :
                 if failed_data:
                     for attack in details['attacks']:
@@ -316,7 +318,8 @@ class EvalData(object):
                 eth = float(Web3.fromWei(eth, 'ether'))
                 eco_loss['ether']['reentrancy'][target] += eth
                 eth_dollar_loss['reentrancy'][target] += eth * self.eth_price[tx_time[:10]]
-                self.time_gap_loss(tx_time, tx_hash, target, eth, 'ether', v, 3)
+                if not failed_data:
+                    self.time_gap_loss(tx_time, tx_hash, target, eth, 'ether', v, 3)
             elif v == 'call-after-destruct':
                 suicided_contract = details['suicided_contract']
                 targets.append(suicided_contract)
@@ -329,7 +332,8 @@ class EvalData(object):
                         eth = float(Web3.fromWei(results['ETHER_TRANSFER'], 'ether'))
                         eco_loss['ether']['call-after-destruct'][suicided_contract] += eth
                         eth_dollar_loss['call-after-destruct'][suicided_contract] += eth * self.eth_price[tx_time[:10]]
-                        self.time_gap_loss(tx_time, tx_hash, suicided_contract, eth, 'ether', v, 3)
+                        if not failed_data:
+                            self.time_gap_loss(tx_time, tx_hash, suicided_contract, eth, 'ether', v, 3)
                     elif rt == 'TOKEN_TRANSFER':
                         token = result_type.split(':')[1]
                         if token not in eco_loss['token']['call-after-destruct']:
@@ -361,7 +365,7 @@ class EvalData(object):
     def update_confirmed_vuls(self):
         self.confirmed_vuls = {
             'call-injection': set(self.parity_wallet),
-            'reentrancy': self.attack_data.vul2contrs_open_sourced['reentrancy'],
+            'reentrancy': self.attack_data.vul2contrs['reentrancy'],
             'call-after-destruct': self.attack_data.vul2contrs['call-after-destruct'],
             'integer-overflow': set(self.integer_overflow_contracts['confirmed']),
             'airdrop-hunting': self.attack_data.vul2contrs_open_sourced['airdrop-hunting'],

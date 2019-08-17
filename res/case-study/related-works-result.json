@@ -1,6 +1,11 @@
 {
     "Oyente": {
         "reentrancy": [
+            "0xd654bdd32fc99471455e86c2e7f7d7b6437e9179",
+            "0x26b8af052895080148dabbc1007b3045f023916e",
+            "0xbf78025535c98f4c605fbe9eaf672999abf19dc1",
+            "0x59752433dbe28f5aa59b479958689d353b3dee08",
+            "0xf01fe1a15673a5209c94121c45e2121fe2903416",
             "0x0eb68f34efa0086e4136bca51fc4d0696580643",
             "0x23a91059fdc9579a9fbd0edc5f2ea0bfdb70deb4",
             "0x463f235748bc7862deaa04d85b4b16ac8fafef39",
@@ -15,6 +20,11 @@
     },
     "Securify": {
         "reentrancy": [
+            "0xd654bdd32fc99471455e86c2e7f7d7b6437e9179",
+            "0x26b8af052895080148dabbc1007b3045f023916e",
+            "0xbf78025535c98f4c605fbe9eaf672999abf19dc1",
+            "0x59752433dbe28f5aa59b479958689d353b3dee08",
+            "0xf01fe1a15673a5209c94121c45e2121fe2903416",
             "0x23a91059fdc9579a9fbd0edc5f2ea0bfdb70deb4",
             "0x463f235748bc7862deaa04d85b4b16ac8fafef39",
             "0x4a8d3a662e0fd6a8bd39ed0f91e4c1b729c81a38",
@@ -35,6 +45,14 @@
     },
     "Mythril": {
         "integer-overflow": [
+            "0xfc3a7dc487c6384911f4a2a60af4338bc7f1ab30",
+            "0xd77d1dbc69765d2c39332efb75f266248f8b1a11",
+            "0xedbaf3c5100302dcdda53269322f3730b1f0416d",
+            "0x903f155f2bf707a429c9014c25270a6b0b8f8bb9",
+            "0xed6e3c37886db5696be04ca8b6fc9359d4b32543",
+            "0xa9a8ec071ed0ed5be571396438a046a423a0c206",
+            "0x329bca83b582006ca1fe2c1cf8bbd94ad0e6033a",
+            "0xf88d20043f0e4eee7fa6bf3d3aefdabc39ae036b",
             "0x090fc358fa1a992c083590c7dd33ad5208a02e9d",
             "0x2160e6c0ae8ca7d62fe1f57fc049f8363283ff5f",
             "0x22c10728343e9d49ef25080f74a223878a3d4052",

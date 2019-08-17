@@ -25,7 +25,7 @@ class RelatedWorksRunner:
             print("running on {}".format(v))
             vp = os.path.join(self.bytecodes_path, v)
             for bytecode_file in os.listdir(vp):
-                address = bytecode_file.strip('.hex')
+                address = bytecode_file.split('.')[0]
                 target = address if addr else os.path.join(vp, bytecode_file)
 
                 output_dir = os.path.join(outputs_dir, v)

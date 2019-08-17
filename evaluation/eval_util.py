@@ -154,14 +154,9 @@ class EvalUtil(object):
                 total['vct'].add(c)
                 if v == 'honeypot':
                     continue
-                if v == 'call-after-destruct':
-                    for tx in self.ed.cad.contr2txs[v][c]:
-                        atx[v].add(tx)
-                        total['atx'].add(tx)
-                else:
-                    for tx in self.ed.attack_data.contr2txs[v][c]:
-                        atx[v].add(tx)
-                        total['atx'].add(tx)
+                for tx in self.ed.attack_data.contr2txs[v][c]:
+                    atx[v].add(tx)
+                    total['atx'].add(tx)
             print(v, len(atx[v]))
         print('final total', len(total['vct']), len(total['atx']))
         for v in self.zday:
