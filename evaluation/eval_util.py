@@ -1,6 +1,6 @@
 from config import Config
 
-from transaction_trace.local import EthereumDatabase
+from transaction_trace.local import EthereumDatabase, ContractTransactions, DatabaseName
 from transaction_trace.basic_utils import DatetimeUtils
 
 from related_works import RelatedWorks
@@ -9,7 +9,7 @@ from collections import defaultdict
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from copy import deepcopy
-
+from web3 import Web3
 
 
 class Thresholds(object):
@@ -24,6 +24,35 @@ class EvalUtil(object):
         self.ed = eval_data
         self.related_works = RelatedWorks()
         self.zday = None
+
+    def ci_eth_loss(self, idx_db_user="contract_txs_idx", idx_db_passwd="passwd", idx_db="contract_txs_idx"):
+        with open(Config.CI_LOG_FILE, 'r') as f:
+            lines = f.readlines()
+            rows = []
+            for line in lines:
+                rows.append(eval(line.strip('\n')))
+
+        cands = defaultdict(dict)
+        for row in rows:
+            if 'initWallet(address[],uint256,uint256)' in row['behavior']:
+                if row['caller'] not in cands[row['entry']] or cands[row['entry']][row['caller']] > row['time']:
+                    cands[row['entry']][row['caller']] = row['time']
+
+        eth_loss = defaultdict(int)
+        trace_db = EthereumDatabase("", DatabaseName.TRACE_DATABASE)
+        tx_index_db = ContractTransactions(
+            user=idx_db_user, passwd=idx_db_passwd, db=idx_db)
+        for entry in cands:
+            print('entry:', entry)
+            txs = tx_index_db.read_transactions_of_contract(entry)
+            for d in txs:
+                con = trace_db.get_connection(d)
+                for row in con.read("traces", "from_address, to_address, value, status, block_timestamp"):
+                    if row['status'] and row['from_address'] == entry and row['to_address'] in cands[entry]:
+                        if DatetimeUtils.time_to_str(row['block_timestamp']) > cands[entry][row['to_address']]:
+                            eth_loss[entry] += Web3.fromWei(row['value'], 'ether')
+
+        return eth_loss
 
     def dat_month2txs(self):
         begin = datetime(2015, 8, 1, 0, 0)
@@ -66,7 +95,8 @@ class EvalUtil(object):
                 row = rows[i-1]
                 pos = int(i*100/l) if int(i*100/l) == i * \
                     100/l else int(i*100/l+1)
-                contr_cdf_dat[pos][v] += row[1]*100/len(self.ed.attack_data.vul2txs[v])
+                contr_cdf_dat[pos][v] += row[1]*100 / \
+                    len(self.ed.attack_data.vul2txs[v])
         for i in contr_cdf_dat:
             for v in contr_cdf_dat[i]:
                 if contr_cdf_dat[i][v] == 0:
@@ -96,7 +126,8 @@ class EvalUtil(object):
                 row = rows[i-1]
                 pos = int(i*100/l) if int(i*100/l) == i * \
                     100/l else int(i*100/l+1)
-                bytecode_cdf_dat[pos][v] += row[1]*100/len(self.ed.attack_data.vul2txs[v])
+                bytecode_cdf_dat[pos][v] += row[1]*100 / \
+                    len(self.ed.attack_data.vul2txs[v])
         for i in bytecode_cdf_dat:
             for v in bytecode_cdf_dat[i]:
                 if bytecode_cdf_dat[i][v] == 0:
@@ -119,7 +150,8 @@ class EvalUtil(object):
     def update_zday(self):
         zday = deepcopy(self.ed.confirmed_vuls)
         zday['call-injection'].clear()
-        zday['airdrop-hunting'].remove('0x86c8bf8532aa2601151c9dbbf4e4c4804e042571')
+        zday['airdrop-hunting'].remove(
+            '0x86c8bf8532aa2601151c9dbbf4e4c4804e042571')
         zday['reentrancy'].remove('0xf91546835f756da0c10cfa0cda95b15577b84aa7')
         zday['reentrancy'].remove('0xd2e16a20dd7b1ae54fb0312209784478d069c7b0')
 
@@ -178,27 +210,26 @@ class EvalUtil(object):
 
     def cmp_related_works_wo_vuls(self):
         our_candidates = set()
-        related_works_candidates = set()
+        related_works_candidates = dict()
         reported = defaultdict(set)
         not_reported = defaultdict(set)
 
         for w in self.related_works.datasets:
             dataset = self.related_works.datasets[w]
-            for c in dataset.all_vulnerable_contracts:
-                related_works_candidates.add(c)
+            related_works_candidates[w] = set(dataset.all_vulnerable_contracts)
 
-        for v in self.ed.attack_data.vul2contrs:
-            for c in self.ed.attack_data.vul2contrs[v]:
+        for v in self.ed.confirmed_vuls:
+            for c in self.ed.confirmed_vuls[v]:
                 our_candidates.add(c)
         for c in our_candidates:
-            for w in self.related_works.datasets:
-                dataset = self.related_works.datasets[w]
-                if c in dataset.all_vulnerable_contracts:
+            for w in related_works_candidates:
+                if c in related_works_candidates[w]:
                     reported[w].add(c)
                 elif c in self.ed.create_time and DatetimeUtils.time_to_str(self.ed.create_time[c]) <= Config.dataset_latest_time[w]:
                     not_reported[w].add(c)
 
-        return our_candidates, related_works_candidates, reported, not_reported
+        # import IPython;IPython.embed()
+        return reported, not_reported
 
     def introduction_data(self):
         zzday = set()
@@ -234,9 +265,17 @@ class EvalUtil(object):
             len(self.ed.confirmed_vuls['airdrop-hunting'])))
 
         oveflow_ztxs = set()
-        for c in self.zday['integer-overflow']:
-            for tx in self.ed.attack_data.contr2txs['integer-overflow'][c]:
-                oveflow_ztxs.add(tx)
+        known_vuls_confirmed_txs = set()
+        for v in self.ed.confirmed_vuls:
+            if v in ('integer-overflow', 'reentrancy'):
+                for c in self.ed.confirmed_vuls[v]:
+                    for tx in self.ed.attack_data.contr2txs[v][c]:
+                        known_vuls_confirmed_txs.add(tx)
+                        if v == 'integer-overflow':
+                            oveflow_ztxs.add(tx)
+
+        print("{} of all the ... integer overflow ... {} previously ...".format(
+            len(oveflow_ztxs)/len(known_vuls_confirmed_txs), 73))
 
         local_attemp_txs_rc = {'all': set(), 'rc': set()}
         local_confirm_txs_rc = {'all': set(), 'rc': set()}
@@ -266,11 +305,11 @@ class EvalUtil(object):
                     if v in ('airdrop-hunting', 'integer-overflow'):
                         local_attemp_txs_ai['ai'].add(tx)
 
-        print("{} attemped, {} confirmed between 2015.8 and 2017.8".format(len(local_attemp_txs_rc['rc'])/len(local_attemp_txs_rc['all']), len(local_confirm_txs_rc['rc'])/len(local_confirm_txs_rc['all'])))
+        print("{} attemped, {} confirmed between 2015.8 and 2017.8".format(len(local_attemp_txs_rc['rc'])/len(
+            local_attemp_txs_rc['all']), len(local_confirm_txs_rc['rc'])/len(local_confirm_txs_rc['all'])))
 
-        print("{} attemped, {} confirmed between 2017.9 and 2019.3".format(len(local_attemp_txs_ai['ai'])/len(local_attemp_txs_ai['all']), len(local_confirm_txs_ai['ai'])/len(local_confirm_txs_ai['all'])))
-
-        import IPython;IPython.embed()
+        print("{} attemped, {} confirmed between 2017.9 and 2019.3".format(len(local_attemp_txs_ai['ai'])/len(
+            local_attemp_txs_ai['all']), len(local_confirm_txs_ai['ai'])/len(local_confirm_txs_ai['all'])))
 
         # incident_txs = set()
         # incident_contracts = set()
@@ -321,7 +360,6 @@ class EvalUtil(object):
         #                 unknown_txs.add(tx)
         # print("{} is actually targeting {} previously-unknown".format(
         #     len(unknown_txs)/len(succeed_txs), len(unknown_vuls)))
-
 
         # missed_vuls = set()
         # missed_txs = set()

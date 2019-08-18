@@ -17,7 +17,7 @@ if __name__ == "__main__":
     ep = EvalPatchs(ed)
 
     ed.extract_data(Thresholds(3, 1, 10**72), Thresholds(3, 1, 10**72))
-    ep.replace_call_injection_data(ed.attack_data, ed.tx_time)
+    ep.replace_call_injection_data(ed.attack_data, ed.month2txs, ed.tx_time)
     ed.update_confirmed_vuls()
     eu = EvalUtil(ed)
     eu.update_zday()
