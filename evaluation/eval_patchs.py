@@ -117,6 +117,9 @@ class EvalPatchs(object):
         for row in rows:
             tx_hash = row['tx_hash']
             tx_time[tx_hash] = row['time']
+            tx_month = row['time'][:7]
+            if tx_month not in month2txs:
+                month2txs[tx_month] = defaultdict(set)
             month2txs[row['time'][:7]]['call-injection'].add(tx_hash)
             abnormal_data.vul2txs['call-injection'].add(tx_hash)
             abnormal_data.vul2contrs['call-injection'].add(row['entry'])
