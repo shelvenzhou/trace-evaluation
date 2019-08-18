@@ -3,6 +3,7 @@ from config import Config
 
 from collections import defaultdict
 import os
+import subprocess
 import json
 import time
 
@@ -34,8 +35,12 @@ class RelatedWorksRunner:
                 output_file = os.path.join(output_dir, "{}".format(address))
                 print(bytecode_file)
                 if not os.path.exists(output_file):
-                    re = os.popen(cmd.format(target, output_file))
-                    print(re.read())
+                    try:
+                        re = subprocess.run(cmd.format(target, output_file).split(), timeout=120, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                        print(re.stdout.decode(),re.stderr.decode())
+                    except subprocess.TimeoutExpired:
+                        print('timeout')
+
 
     def run_mythril(self):
         cmd = "myth analyze -a {} -o json > {} --execution-timeout 120"

@@ -52,10 +52,11 @@ class EvalUtil(object):
                     if row['status'] and row['from_address'] == entry and row['to_address'] in cands[entry]:
                         tx_time = DatetimeUtils.time_to_str(row['block_timestamp'])
                         if tx_time > cands[entry][row['to_address']]:
-                            eth = Web3.fromWei(row['value'], 'ether')
-                            print(row['transaction_hash'], eth)
-                            eth_loss[entry] += eth
-                            eth_dollar_loss[entry] += eth * self.ed.eth_price[tx_time[:10]]
+                            eth = float(Web3.fromWei(row['value'], 'ether'))
+                            if eth > 0:
+                                print(row['transaction_hash'], eth)
+                                eth_loss[entry] += eth
+                                eth_dollar_loss[entry] += eth * self.ed.eth_price[tx_time[:10]]
 
         return eth_loss, eth_dollar_loss
 
