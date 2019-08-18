@@ -39,7 +39,7 @@ class EvalUtil(object):
                     cands[row['entry']][row['caller']] = row['time']
 
         eth_loss = defaultdict(int)
-        trace_db = EthereumDatabase("", DatabaseName.TRACE_DATABASE)
+        trace_db = EthereumDatabase("/mnt/data/bigquery", DatabaseName.TRACE_DATABASE)
         tx_index_db = ContractTransactions(
             user=idx_db_user, passwd=idx_db_passwd, db=idx_db)
         for entry in cands:
@@ -47,10 +47,12 @@ class EvalUtil(object):
             txs = tx_index_db.read_transactions_of_contract(entry)
             for d in txs:
                 con = trace_db.get_connection(d)
-                for row in con.read("traces", "from_address, to_address, value, status, block_timestamp"):
+                for row in con.read("traces", "transaction_hash, from_address, to_address, value, status, block_timestamp"):
                     if row['status'] and row['from_address'] == entry and row['to_address'] in cands[entry]:
                         if DatetimeUtils.time_to_str(row['block_timestamp']) > cands[entry][row['to_address']]:
-                            eth_loss[entry] += Web3.fromWei(row['value'], 'ether')
+                            eth = Web3.fromWei(row['value'], 'ether')
+                            print(row['transaction_hash'], eth)
+                            eth_loss[entry] += eth
 
         return eth_loss
 
