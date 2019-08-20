@@ -41,6 +41,7 @@ class EvalData(object):
         self.integer_overflow_contracts = None
         self.integer_overflow_cve = None
         self.honeypot_contracts = None
+        self.airdrop_hunting_contracts = None
         self.defense_contracts = dict()
 
         self.related_works_result = None
@@ -108,6 +109,9 @@ class EvalData(object):
 
         with open('res/case-study/honeypot-contracts.json', 'rb') as f:
             self.honeypot_contracts = json.load(f)
+
+        with open('res/case-study/airdrop-hunting-contracts.json', 'rb') as f:
+            self.airdrop_hunting_contracts = json.load(f)
 
         with open('res/case-study/integer-overflow-cvelist.json', 'rb') as f:
             self.integer_overflow_cve = json.load(f)
@@ -368,6 +372,6 @@ class EvalData(object):
             'reentrancy': self.attack_data.vul2contrs['reentrancy'],
             'call-after-destruct': self.attack_data.vul2contrs['call-after-destruct'],
             'integer-overflow': set(self.integer_overflow_contracts['confirmed']),
-            'airdrop-hunting': self.attack_data.vul2contrs_open_sourced['airdrop-hunting'],
+            'airdrop-hunting': set(self.airdrop_hunting_contracts['confirmed']),
             'honeypot': set(self.honeypot_contracts['confirmed'])
         }

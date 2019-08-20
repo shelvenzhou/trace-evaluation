@@ -48,6 +48,8 @@ class EvalUtil(object):
             txs = tx_index_db.read_transactions_of_contract(entry)
             for d in txs:
                 con = trace_db.get_connection(d)
+                if con == None:
+                    continue
                 for row in con.read("traces", "transaction_hash, from_address, to_address, value, status, block_timestamp"):
                     if row['status'] and row['from_address'] == entry and row['to_address'] in cands[entry]:
                         tx_time = DatetimeUtils.time_to_str(row['block_timestamp'])
