@@ -18,27 +18,27 @@ if __name__ == "__main__":
         for row in r:
             open_source.add(row[0])
 
-    unprofit_honeypots = set()
-    with open("res/case-study/unprofited_honeypots.csv", "r") as f:
-        r = csv.reader(f)
-        for row in r:
-            unprofit_honeypots.add(row[0])
+    # unprofit_honeypots = set()
+    # with open("res/case-study/unprofited_honeypots.csv", "r") as f:
+    #     r = csv.reader(f)
+    #     for row in r:
+    #         unprofit_honeypots.add(row[0])
     leaked_honeypots = set()
     with open("res/case-study/leaked_honeypots.csv", "r") as f:
         r = csv.reader(f)
         for row in r:
             leaked_honeypots.add(row[0])
 
-    wallet_contracts = set()
-    with open("res/defense_contracts/wallet_contracts.csv", "r") as f:
-        r = csv.reader(f)
-        for row in r:
-            wallet_contracts.add(row[0])
-    forwarder_contracts = set()
-    with open("res/defense_contracts/forwarder_contracts.csv", "r") as f:
-        r = csv.reader(f)
-        for row in r:
-            forwarder_contracts.add(row[0])
+    # wallet_contracts = set()
+    # with open("res/defense_contracts/wallet_contracts.csv", "r") as f:
+    #     r = csv.reader(f)
+    #     for row in r:
+    #         wallet_contracts.add(row[0])
+    # forwarder_contracts = set()
+    # with open("res/defense_contracts/forwarder_contracts.csv", "r") as f:
+    #     r = csv.reader(f)
+    #     for row in r:
+    #         forwarder_contracts.add(row[0])
 
     confirmed_honeypots = set()
     with open("res/results/confirmed_honeypot.csv", "r") as f:

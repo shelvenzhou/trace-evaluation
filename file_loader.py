@@ -7,54 +7,72 @@ from transaction_trace.analysis.results import AttackCandidateExporter
 from result_filter import ResultFilter
 
 
-def call_injection_extractor(call_injections, filtered, call_injection):
-    for attack in call_injection.details["attacks"]:
+def call_injection_ct_extractor(candidates, filtered, candidate):
+    for attack in candidate.details["attacks"]:
         target = attack["entry_edge"][1].split(":")[1]
-        call_injections[target].append(call_injection)
+        candidates[target].append(candidate)
 
 
-def reentrancy_extractor(reentrancies, filtered, reentrancy):
-    for attack in reentrancy.details["attacks"]:
+def reentrancy_ct_extractor(candidates, filtered, candidate):
+    for attack in candidate.details["attacks"]:
         target = attack["entry"].split(":")[1]
-        reentrancies[target].append(reentrancy)
+        candidates[target].append(candidate)
 
 
-def integer_overflow_extractor(integer_overflows, filtered, integer_overflow):
-    for attack in integer_overflow.details["attacks"]:
+def integer_overflow_ct_extractor(candidates, filtered, candidate):
+    for attack in candidate.details["attacks"]:
         target = attack["edge"][1].split(":")[1]
-        integer_overflows[target].append(integer_overflow)
+        candidates[target].append(candidate)
 
 
-def airdrop_hunting_extractor(airdrop_huntings, filtered, airdrop_hunting):
-    if len(airdrop_hunting.results) == 0:
-        airdrop_huntings["unknown"].append(airdrop_hunting)
+def airdrop_hunting_ct_extractor(candidates, filtered, candidate):
+    if len(candidate.results) == 0:
+        candidates["unknown"].append(candidate)
     else:
-        for _, tokens in airdrop_hunting.results.items():
+        for _, tokens in candidate.results.items():
             for token_transfer_event in tokens:
                 token_addr = token_transfer_event.split(":")[1]
-                airdrop_huntings[token_addr].append(airdrop_hunting)
+                candidates[token_addr].append(candidate)
 
 
-def call_after_destruct_extractor(call_after_destructs, filtered, call_after_destruct):
-    destructed_contract = call_after_destruct.details["suicided_contract"]
-    call_after_destructs[destructed_contract].append(call_after_destruct)
+def call_after_destruct_ct_extractor(candidates, filtered, candidate):
+    destructed_contract = candidate.details["suicided_contract"]
+    candidates[destructed_contract].append(candidate)
 
 
-def honeypot_extractor(honeypots, filtered, honeypot):
-    contract = honeypot.details["contract"]
-    if ResultFilter.honeypot_filter(honeypot):
-        filtered[contract].append(honeypot)
+def honeypot_ct_extractor(candidates, filtered, candidate):
+    contract = candidate.details["contract"]
+    if ResultFilter.honeypot_filter(candidate):
+        filtered[contract].append(candidate)
     else:
-        honeypots[contract].append(honeypot)
+        candidates[contract].append(candidate)
 
 
-contract_addr_extractors = {
-    "call-injection": call_injection_extractor,
-    "reentrancy": reentrancy_extractor,
-    "integer-overflow": integer_overflow_extractor,
-    "airdrop-hunting": airdrop_hunting_extractor,
-    "call-after-destruct": call_after_destruct_extractor,
-    "honeypot": honeypot_extractor,
+ct_extractors = {
+    "call-injection": call_injection_ct_extractor,
+    "reentrancy": reentrancy_ct_extractor,
+    "integer-overflow": integer_overflow_ct_extractor,
+    "airdrop-hunting": airdrop_hunting_ct_extractor,
+    "call-after-destruct": call_after_destruct_ct_extractor,
+    "honeypot": honeypot_ct_extractor,
+}
+
+
+def general_key_extractor(candidate):
+    return candidate.details["transaction"]
+
+
+def honeypot_key_extractor(candidate):
+    return candidate.details["contract"]
+
+
+key_extractors = {
+    "call-injection": general_key_extractor,
+    "reentrancy": general_key_extractor,
+    "integer-overflow": general_key_extractor,
+    "airdrop-hunting": general_key_extractor,
+    "call-after-destruct": general_key_extractor,
+    "honeypot": honeypot_key_extractor,
 }
 
 
@@ -68,7 +86,7 @@ class FileLoader:
     @staticmethod
     def load_contracts_with_defense(filepath):
         """
-        contract_address -> contract_creation_time
+        ct -> contract_creation_time
         """
         contracts = dict()
         with open(filepath, "r") as f:
@@ -81,13 +99,26 @@ class FileLoader:
     @staticmethod
     def load_attack_candidates(filepath):
         """
-        attack_type -> contract_address -> attacks
+        attack_type -> ct -> attacks
         """
         with open(filepath, "r") as f:
             raw_data = AttackCandidateExporter.load_candidates(f)
 
         candidates = defaultdict(lambda: defaultdict(list))
         filtered = defaultdict(lambda: defaultdict(list))
-        for attack in raw_data:
-            contract_addr_extractors[attack.type](candidates[attack.type], filtered[attack.type], attack)
+        for cand in raw_data:
+            ct_extractors[cand.type](candidates[cand.type], filtered[cand.type], cand)
         return candidates, filtered
+
+    @staticmethod
+    def load_raw_attack_candidates(filepath):
+        """
+        tx/ct -> attack
+        """
+        with open(filepath, "r") as f:
+            raw_data = AttackCandidateExporter.load_candidates(f)
+
+        candidates = dict()
+        for cand in raw_data:
+            candidates[key_extractors[cand.type](cand)] = cand
+        return candidates
