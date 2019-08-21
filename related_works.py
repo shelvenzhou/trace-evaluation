@@ -37,10 +37,9 @@ class RelatedWorksRunner:
                 if not os.path.exists(output_file):
                     try:
                         re = subprocess.run(cmd.format(target, output_file).split(), timeout=120, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                        print(re.stdout.decode(),re.stderr.decode())
+                        print(re.stdout.decode(), re.stderr.decode())
                     except subprocess.TimeoutExpired:
                         print('timeout')
-
 
     def run_mythril(self):
         cmd = "myth analyze -a {} -o json > {} --execution-timeout 120"

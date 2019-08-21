@@ -20,12 +20,52 @@ class Thresholds(object):
 
 
 class EvalUtil(object):
-    def __init__(self, eval_data):
+    def __init__(self, eval_data, idx_db_passwd='orzorz'):
         self.ed = eval_data
         self.related_works = RelatedWorks()
         self.zday = None
 
-    def ci_eth_loss(self, idx_db_user="contract_txs_idx", idx_db_passwd="passwd", idx_db="contract_txs_idx"):
+        self.trace_db = EthereumDatabase("/mnt/data/bigquery/ethereum_traces", DatabaseName.TRACE_DATABASE)
+        self.tx_index_db = ContractTransactions(
+            user="contract_txs_idx", passwd=idx_db_passwd, db="contract_txs_idx")
+
+    def peak_table(self):
+        peak_period = {
+            'reentrancy': ('2016-05', '2016-06', '2016-08', '2016-09'),
+            'call-injection': ('2017-06', '2017-07', '2017-07', '2017-08'),
+            'integer-overflow': ('2018-03', '2018-04', '2018-05', '2018-06'),
+            'airdrop-hunting': ('2018-08', '2018-09', '2019-01', '2019-02')
+        }
+        peak_result = {
+            'before': defaultdict(set),
+            'after': defaultdict(set)
+        }
+        for v in self.ed.confirmed_vuls:
+            if v in peak_period:
+                print(v, '...')
+                cc = 0
+                for c in self.ed.confirmed_vuls[v]:
+                    for tx in self.ed.attack_data.contr2txs[v][c]:
+                        if peak_period[v][1] <= self.ed.tx_time[tx][:7] <= peak_period[v][2]:
+                            print(c)
+                            cc += 1
+                            txs = self.tx_index_db.read_transactions_of_contract(c)
+                            for d in txs:
+                                t = None
+                                if d[:7] == peak_period[v][0]:
+                                    t = 'before'
+                                elif d[:7] == peak_period[v][-1]:
+                                    t = 'after'
+                                if t:
+                                    for tx in txs[d]:
+                                        peak_result[t][v].add(tx)
+                            break
+                print(v, cc)
+        return peak_result
+
+
+
+    def ci_eth_loss(self):
         with open(Config.CI_LOG_FILE, 'r') as f:
             lines = f.readlines()
             rows = []
@@ -40,14 +80,11 @@ class EvalUtil(object):
 
         eth_loss = defaultdict(int)
         eth_dollar_loss = defaultdict(int)
-        trace_db = EthereumDatabase("/mnt/data/bigquery/ethereum_traces", DatabaseName.TRACE_DATABASE)
-        tx_index_db = ContractTransactions(
-            user=idx_db_user, passwd=idx_db_passwd, db=idx_db)
         for entry in cands:
             print('entry:', entry)
-            txs = tx_index_db.read_transactions_of_contract(entry)
+            txs = self.tx_index_db.read_transactions_of_contract(entry)
             for d in txs:
-                con = trace_db.get_connection(d)
+                con = self.trace_db.get_connection(d)
                 if con == None:
                     continue
                 for row in con.read("traces", "transaction_hash, from_address, to_address, value, status, block_timestamp"):
@@ -237,12 +274,12 @@ class EvalUtil(object):
                     not_reported[w].add(c)
 
         # import IPython;IPython.embed()
-        return reported, not_reported
+        return reported, not_reported, related_works_candidates
 
     def introduction_data(self):
         zzday = set()
         for v in ('reentrancy', 'integer-overflow', 'honeypot'):
-            zzday.union(self.zday[v])
+            zzday = zzday.union(self.zday[v])
         print("{} zero-day vulnerabilities with ...".format(len(zzday)))
 
         attempted_txs = set()
