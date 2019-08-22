@@ -25,9 +25,11 @@ class EvalUtil(object):
         self.related_works = RelatedWorks()
         self.zday = None
 
-        self.trace_db = EthereumDatabase("/mnt/data/bigquery/ethereum_traces", DatabaseName.TRACE_DATABASE)
-        self.tx_index_db = ContractTransactions(
-            user="contract_txs_idx", passwd=idx_db_passwd, db="contract_txs_idx")
+        # self.trace_db = EthereumDatabase("/mnt/data/bigquery/ethereum_traces", DatabaseName.TRACE_DATABASE)
+        self.trace_db = None
+        # self.tx_index_db = ContractTransactions(
+        #     user="contract_txs_idx", passwd=idx_db_passwd, db="contract_txs_idx")
+        self.tx_index_db = None
 
     def peak_table(self):
         peak_period = {
@@ -80,6 +82,7 @@ class EvalUtil(object):
 
         eth_loss = defaultdict(int)
         eth_dollar_loss = defaultdict(int)
+        white_hat_save = {'eth': 0, 'dollar': 0}
         for entry in cands:
             print('entry:', entry)
             txs = self.tx_index_db.read_transactions_of_contract(entry)
@@ -96,8 +99,11 @@ class EvalUtil(object):
                                 print(row['transaction_hash'], eth)
                                 eth_loss[entry] += eth
                                 eth_dollar_loss[entry] += eth * self.ed.eth_price[tx_time[:10]]
+                                if row['to_address'] in Config.white_hat_group:
+                                    white_hat_save['eth'] += eth
+                                    white_hat_save['dollar'] += eth * self.ed.eth_price[tx_time[:10]]
 
-        return eth_loss, eth_dollar_loss
+        return eth_loss, eth_dollar_loss, white_hat_save
 
     def dat_month2txs(self):
         begin = datetime(2015, 8, 1, 0, 0)
@@ -229,8 +235,6 @@ class EvalUtil(object):
             print(v, len(self.ed.confirmed_vuls[v]))
             for c in self.ed.confirmed_vuls[v]:
                 total['vct'].add(c)
-                if v == 'honeypot':
-                    continue
                 for tx in self.ed.attack_data.contr2txs[v][c]:
                     atx[v].add(tx)
                     total['atx'].add(tx)
@@ -240,10 +244,9 @@ class EvalUtil(object):
             print(v, len(self.zday[v]))
             for c in self.zday[v]:
                 total['zvct'].add(c)
-                if v != 'honeypot':
-                    for tx in self.ed.attack_data.contr2txs[v][c]:
-                        zatx[v].add(tx)
-                        total['zatx'].add(tx)
+                for tx in self.ed.attack_data.contr2txs[v][c]:
+                    zatx[v].add(tx)
+                    total['zatx'].add(tx)
             print(v, len(zatx[v]))
         print('zday total', len(total['zvct']), len(total['zatx']))
         for v in self.ed.failed_data.vul2txs:
@@ -254,31 +257,38 @@ class EvalUtil(object):
         print('attemp total', len(total['attemp_tx']))
 
     def cmp_related_works_wo_vuls(self):
-        our_candidates = set()
-        related_works_candidates = dict()
-        reported = defaultdict(set)
-        not_reported = defaultdict(set)
+        events = {
+            'reentrancy': [
+                '0xf91546835f756da0c10cfa0cda95b15577b84aa7',
+                '0xd2e16a20dd7b1ae54fb0312209784478d069c7b0'
+            ],
+        }
+        events['call-injection'] = self.ed.parity_wallet
+        reported_ct = defaultdict(set)
+        reported_tx = defaultdict(set)
+
+        related_work_candidates = defaultdict(set)
 
         for w in self.related_works.datasets:
             dataset = self.related_works.datasets[w]
-            related_works_candidates[w] = set(dataset.all_vulnerable_contracts)
+            for v in dataset.typed_vulnerable_contracts:
+                for c in dataset.typed_vulnerable_contracts[v]:
+                    related_work_candidates[v].add(c)
 
         for v in self.ed.confirmed_vuls:
             for c in self.ed.confirmed_vuls[v]:
-                our_candidates.add(c)
-        for c in our_candidates:
-            for w in related_works_candidates:
-                if c in related_works_candidates[w]:
-                    reported[w].add(c)
-                elif c in self.ed.create_time and DatetimeUtils.time_to_str(self.ed.create_time[c]) <= Config.dataset_latest_time[w]:
-                    not_reported[w].add(c)
+                if v in self.zday and c in self.zday[v] or v in events and c in events[v]:
+                    continue
+                reported_ct[v].add(c)
+                for tx in self.ed.attack_data.contr2txs[v][c]:
+                    reported_tx[v].add(tx)
 
         # import IPython;IPython.embed()
-        return reported, not_reported, related_works_candidates
+        return reported_ct, reported_tx, related_work_candidates
 
     def introduction_data(self):
         zzday = set()
-        for v in ('reentrancy', 'integer-overflow', 'honeypot'):
+        for v in ('reentrancy', 'integer-overflow'):
             zzday = zzday.union(self.zday[v])
         print("{} zero-day vulnerabilities with ...".format(len(zzday)))
 
@@ -312,15 +322,15 @@ class EvalUtil(object):
         oveflow_ztxs = set()
         known_vuls_confirmed_txs = set()
         for v in self.ed.confirmed_vuls:
-            if v in ('integer-overflow', 'reentrancy'):
+            if v in ('integer-overflow'):
                 for c in self.ed.confirmed_vuls[v]:
                     for tx in self.ed.attack_data.contr2txs[v][c]:
                         known_vuls_confirmed_txs.add(tx)
-                        if v == 'integer-overflow':
+                        if v == 'integer-overflow' and c in self.zday['integer-overflow']:
                             oveflow_ztxs.add(tx)
 
         print("{} of all the ... integer overflow ... {} previously ...".format(
-            len(oveflow_ztxs)/len(known_vuls_confirmed_txs), 73))
+            len(oveflow_ztxs)/len(known_vuls_confirmed_txs), len(self.zday['integer-overflow'])))
 
         local_attemp_txs_rc = {'all': set(), 'rc': set()}
         local_confirm_txs_rc = {'all': set(), 'rc': set()}

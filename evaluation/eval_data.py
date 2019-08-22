@@ -373,5 +373,6 @@ class EvalData(object):
             'call-after-destruct': self.attack_data.vul2contrs['call-after-destruct'],
             'integer-overflow': set(self.integer_overflow_contracts['confirmed']),
             'airdrop-hunting': set(self.airdrop_hunting_contracts['confirmed']),
-            'honeypot': set(self.honeypot_contracts['confirmed'])
+            'honeypot': set(self.honeypot_contracts['confirmed']),
+            'transaction-order-dependence-checker': self.attack_data.vul2contrs['transaction-order-dependence-checker']
         }

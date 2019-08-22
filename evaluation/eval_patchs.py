@@ -10,6 +10,32 @@ class EvalPatchs(object):
     def __init__(self, eval_data):
         self.ed = eval_data
 
+    def append_tod(self, eval_data, tod_log_path, failed_tod_log_path):
+        with open(tod_log_path, 'rb') as f:
+            attack_candidates = AttackCandidateExporter.load_candidates(f)
+        with open(failed_tod_log_path, 'rb') as f:
+            failed_candidates = AttackCandidateExporter.load_candidates(f)
+
+        abnormal_data = {eval_data.attack_data: attack_candidates, eval_data.failed_data: failed_candidates}
+        for data in abnormal_data:
+            for cand in abnormal_data[data]:
+                v = cand.type
+                details = cand.details
+                results = cand.results
+                if v != 'transaction-order-dependence-checker':
+                    continue
+                target = details['contract']
+                data.vul2contrs[v].add(target)
+                if self.ed.open_source_contract(target):
+                    data.vul2contrs_open_sourced[v].add(target)
+                for affected_txs in results['affected_txs']:
+                    tx_hash = affected_txs['affected_tx']
+                    data.vul2txs[v].add(tx_hash)
+                    if target not in data.contr2txs[v]:
+                        data.contr2txs[v][target] = set()
+                    data.contr2txs[v][target].add(tx_hash)
+
+
     def move_airdrop_data_from_failed(self):
         to_remove = list()
         for cand in self.ed.failed_candidates:
@@ -29,32 +55,23 @@ class EvalPatchs(object):
         abnormal_data.contr2txs['honeypot'].clear()
         abnormal_data.vul2contrs_open_sourced['honeypot'].clear()
 
-        eth_loss = 0
         with open(honeypot_log_path, 'rb') as f:
             candidates = AttackCandidateExporter.load_candidates(f)
         for cand in candidates:
             v = cand.type
             details = cand.details
-            results = cand.results
-            targets = []
 
-            if v == 'honeypot' and len(details['profit_txs']) > 0:
-                tx_hash = details['profit_txs'][0]
-                targets.append(details['contract'])
-                self.ed.honeypot_profit_txs[details['contract']
-                                         ] = details['profit_txs']
-                eth_loss += Web3.fromWei(results['profits'], 'ether')
-            if len(targets) == 0:
-                continue
-            abnormal_data.vul2txs[v].add(tx_hash)
-            for target in targets:
-                abnormal_data.vul2contrs[v].add(target)
-                if target not in abnormal_data.contr2txs[v]:
-                    abnormal_data.contr2txs[v][target] = set()
-                abnormal_data.contr2txs[v][target].add(tx_hash)
-                if self.ed.open_source_contract(target):
-                    abnormal_data.vul2contrs_open_sourced[v].add(target)
-        return eth_loss
+            if v == 'honeypot':
+                target = details['contract']
+                if target in self.ed.honeypot_contracts['candidates']:
+                    abnormal_data.vul2contrs[v].add(target)
+                    if self.ed.open_source_contract(target):
+                        abnormal_data.vul2contrs_open_sourced[v].add(target)
+                    for tx in details['profit_txs']:
+                        abnormal_data.vul2txs[v].add(tx)
+                        if target not in abnormal_data.contr2txs[v]:
+                            abnormal_data.contr2txs[v][target] = set()
+                        abnormal_data.contr2txs[v][target].add(tx)
 
     def replace_reentrancy(self, abnormal_data, reen_log_path):
         abnormal_data.vul2txs['reentrancy'].clear()
@@ -114,10 +131,13 @@ class EvalPatchs(object):
             for line in lines:
                 rows.append(eval(line.strip('\n')))
 
+        white_hat_txs = set()
         for row in rows:
             tx_hash = row['tx_hash']
             tx_time[tx_hash] = row['time']
             tx_month = row['time'][:7]
+            if row['caller'] in Config.white_hat_group:
+                white_hat_txs.add(tx_hash)
             if tx_month not in month2txs:
                 month2txs[tx_month] = defaultdict(set)
             month2txs[row['time'][:7]]['call-injection'].add(tx_hash)
@@ -132,3 +152,5 @@ class EvalPatchs(object):
                     row['entry'])
             if 'initWallet(address[],uint256,uint256)' in row['behavior']:
                 self.ed.parity_wallet.add(row['entry'])
+
+        return white_hat_txs
