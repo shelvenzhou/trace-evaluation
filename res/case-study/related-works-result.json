@@ -16,6 +16,11 @@
             "0xd116d1349c1382b0b302086a4e4219ae4f8634ff",
             "0xd2e16a20dd7b1ae54fb0312209784478d069c7b0",
             "0xe610af01f92f19679327715b426c35849c47c657"
+        ],
+        "transaction-order-dependence-checker": [
+            "0x564e7e17e7b0437c7ee6d3840784658086192249",
+            "0x29dfaaedacf03910a2bc0588fc46edf18ff5c72f",
+            "0xd27cb313898f91015d36d3bb003b06413ba3be4d"
         ]
     },
     "Securify": {
@@ -38,7 +43,16 @@
             "0xd116d1349c1382b0b302086a4e4219ae4f8634ff",
             "0xe610af01f92f19679327715b426c35849c47c657"
         ],
-        "call-after-destruct": []
+        "call-after-destruct": [],
+        "transaction-order-dependence-checker": [
+            "0xa327075af2a223a1c83a36ada1126afe7430f955",
+            "0x6bb68f9d12e7c1ab805d4cbed2f12c7d5d877283",
+            "0x564e7e17e7b0437c7ee6d3840784658086192249",
+            "0x109c4f2ccc82c4d77bde15f306707320294aea3f",
+            "0x29dfaaedacf03910a2bc0588fc46edf18ff5c72f",
+            "0xbaa54d6e90c3f4d7ebec11bd180134c7ed8ebb52",
+            "0x478965b36a6e0a2f756a020b331b7578e10b4dc9"
+        ]
     },
     "teEther": {
         "call-after-destruct": [

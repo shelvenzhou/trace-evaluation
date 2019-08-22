@@ -57,6 +57,7 @@ class EvalData(object):
         self.failed_loss = None
         self.eth_dollar_loss = None
         self.three_months_loss = {'ether': defaultdict(dict), 'token': defaultdict(dict)}
+        self.dark_dao_loss = None
 
         self.attack_data = AbnormalData()
         self.failed_data = AbnormalData()
@@ -224,6 +225,8 @@ class EvalData(object):
             'token': defaultdict(dict)
         }
         eth_dollar_loss = defaultdict(dict)
+        dark_dao = {'ether': 0, 'dollar': 0}
+        white_dao = {'ether': 0, 'dollar': 0}
 
         month2txs = dict()
 
@@ -305,8 +308,11 @@ class EvalData(object):
                 if target == None:
                     continue
                 eth = 0
+                dark = False
                 for node in results:
                     for result_type in results[node]:
+                        if node == '0x304a554a310c7e546dfe434669c62820b7d83490':
+                            dark = True
                         rt = result_type.split(':')[0]
                         if rt == 'ETHER_TRANSFER':
                             if results[node][result_type] > eth:
@@ -324,6 +330,12 @@ class EvalData(object):
                 eth_dollar_loss['reentrancy'][target] += eth * self.eth_price[tx_time[:10]]
                 if not failed_data:
                     self.time_gap_loss(tx_time, tx_hash, target, eth, 'ether', v, 3)
+                if dark:
+                    dark_dao['ether'] += eth
+                    dark_dao['dollar'] += eth * self.eth_price[tx_time[:10]]
+                if details['tx_caller'] in Config.white_hat_group:
+                    white_dao['ether'] += eth
+                    white_dao['dollar'] += eth * self.eth_price[tx_time[:10]]
             elif v == 'call-after-destruct':
                 suicided_contract = details['suicided_contract']
                 targets.append(suicided_contract)
@@ -365,6 +377,8 @@ class EvalData(object):
             self.attack_loss = eco_loss
             self.eth_dollar_loss = eth_dollar_loss
             self.month2txs = month2txs
+            self.dark_dao_loss = dark_dao
+            self.white_dao_loss = white_dao
 
     def update_confirmed_vuls(self):
         self.confirmed_vuls = {

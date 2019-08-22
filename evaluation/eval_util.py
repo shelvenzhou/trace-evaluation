@@ -274,14 +274,17 @@ class EvalUtil(object):
             for v in dataset.typed_vulnerable_contracts:
                 for c in dataset.typed_vulnerable_contracts[v]:
                     related_work_candidates[v].add(c)
+        for w in self.ed.related_works_result:
+            for v in self.ed.related_works_result[w]:
+                for c in self.ed.related_works_result[w][v]:
+                    related_work_candidates[v].add(c)
 
         for v in self.ed.confirmed_vuls:
             for c in self.ed.confirmed_vuls[v]:
-                if v in self.zday and c in self.zday[v] or v in events and c in events[v]:
-                    continue
-                reported_ct[v].add(c)
-                for tx in self.ed.attack_data.contr2txs[v][c]:
-                    reported_tx[v].add(tx)
+                if c in related_work_candidates[v]:
+                    reported_ct[v].add(c)
+                    for tx in self.ed.attack_data.contr2txs[v][c]:
+                        reported_tx[v].add(tx)
 
         # import IPython;IPython.embed()
         return reported_ct, reported_tx, related_work_candidates
